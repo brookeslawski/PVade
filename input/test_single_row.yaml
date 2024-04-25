@@ -1,17 +1,17 @@
 general:
   geometry_module: panels3d
-  output_dir: output/test
+  output_dir: output/single_panel
   mesh_only: false
-  structural_analysis: false
+  structural_analysis: true
   fluid_analysis: true
 domain:
   x_min: -20
-  x_max: 40 #100
+  x_max: 100
   y_min: -30
   y_max: 30 # 20+39 39 is panel to panel 
   z_min: 0
   z_max: 20
-  l_char: 2.5 #1.25 # 1.0
+  l_char: 1.25 # 1.0
 pv_array:
   stream_rows: 1
   elevation: 2.1
@@ -26,7 +26,7 @@ pv_array:
   span_fixation_pts: [13.2]
 solver:
   dt: .01 #0.0025
-  t_final: 0.1 # 20.0 # 10.0
+  t_final: 20.0 # 10.0
   solver1_ksp: gmres
   solver2_ksp: gmres
   solver3_ksp: gmres
