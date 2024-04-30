@@ -388,4 +388,8 @@ def build_temperature_boundary_conditions(self, domain, params, functionspace):
     dofs = get_facet_dofs_by_gmsh_tag(domain, functionspace, "y_min")
     bctemperature.append(dolfinx.fem.dirichletbc(theta0_y_min_scalar, dofs, functionspace))
     
+    if domain.rank == 0:
+        print("applying bottom wall temp = {}".format(theta0_y_min)) 
+        print("applying top wall temp = {}".format(theta0_y_max))
+
     return bctemperature

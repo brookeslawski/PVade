@@ -148,8 +148,10 @@ class Flow:
         nu = dolfinx.fem.Constant(domain.fluid.msh, (params.fluid.nu))
 
         # Define thermal fluid properties
-        Ra = dolfinx.fem.Constant(domain.fluid.msh, PETSc.ScalarType(1e5))
-        Pr = dolfinx.fem.Constant(domain.fluid.msh, PETSc.ScalarType(0.7))
+        # Ra = dolfinx.fem.Constant(domain.fluid.msh, PETSc.ScalarType(1e5))
+        Ra = dolfinx.fem.Constant(domain.fluid.msh, PETSc.ScalarType(1))
+        # Pr = dolfinx.fem.Constant(domain.fluid.msh, PETSc.ScalarType(0.7))
+        Pr = dolfinx.fem.Constant(domain.fluid.msh, PETSc.ScalarType(1.0))
         g = dolfinx.fem.Constant(domain.fluid.msh, (0.0, 1.0, 0.0)) # ?? y is up? or z?
         # nu = dolfinx.fem.Constant(domain.fluid.msh, PETSc.ScalarType(1))
 
@@ -186,11 +188,11 @@ class Flow:
         self.theta_k1 = dolfinx.fem.Function(self.temperature)
 
         # initialize temperature in domain as smooth gradient between bottom wall and top wall temperatures
-        self.temperature_k.interpolate(lambda x: (params.fluid.init_temperature_y_min + (x[1] / params.domain.y_max) * (params.fluid.init_temperature_y_max - params.fluid.init_temperature_y_min)))
+        # self.temperature_k.interpolate(lambda x: (params.fluid.init_temperature_y_min + (x[1] / params.domain.y_max) * (params.fluid.init_temperature_y_max - params.fluid.init_temperature_y_min)))
         # non-dimensional temperature
-        self.theta_k.x.array[:] = (self.temperature_k.x.array[:] - self.T_r) / self.DeltaT # from Oeurtatani et al. 2008
-        if domain.rank == 0:
-            print('initialized temperature_k and theta_k')
+        # self.theta_k.x.array[:] = (self.temperature_k.x.array[:] - self.T_r) / self.DeltaT # from Oeurtatani et al. 2008
+        # if domain.rank == 0:
+        #     print('initialized temperature_k and theta_k')
 
         if params.fluid.initialize_with_inflow_bc:
             # self.inflow_profile = dolfinx.fem.Function(self.V)
@@ -292,7 +294,7 @@ class Flow:
         # self.U_ALE = domain.fluid_mesh_displacement / self.dt_c
 
         self.F1 = (
-            (1.0 / self.dt_c) * ufl.inner(self.u - self.u_k1, self.v) * ufl.dx # [TODO] add Pr to this line
+            (1.0 / Pr) * ((1.0 / self.dt_c) * ufl.inner(self.u - self.u_k1, self.v) * ufl.dx
             + ufl.inner(
                 ufl.dot(
                     U_AB - self.U_ALE,
@@ -300,7 +302,7 @@ class Flow:
                 ),
                 self.v,
             )
-            * ufl.dx
+            * ufl.dx)
             + (nu + self.nu_T) * ufl.inner(ufl.grad(U_CN), ufl.grad(self.v)) * ufl.dx
             + (1.0 / self.rho_c) * ufl.inner(ufl.grad(self.p_k1), self.v) * ufl.dx
             - (1.0 / self.rho_c) * ufl.inner(self.dpdx, self.v) * ufl.dx
@@ -355,7 +357,7 @@ class Flow:
             + ufl.inner(ufl.nabla_grad(self.theta), ufl.nabla_grad(self.s)) * ufl.dx
             + ufl.inner(ufl.dot(self.u_k, ufl.nabla_grad(self.theta)), self.s) * ufl.dx
         )  # needs to be reassembled bc of u_
-        self.L6 = dolfinx.fem.form((1.0 / self.dt_c) * ufl.inner(self.theta_k, self.s) * ufl.dx)  # needs to be reassembled bc of theta_n
+        self.L6 = dolfinx.fem.form((1.0 / self.dt_c) * ufl.inner(self.theta_k1, self.s) * ufl.dx)  # needs to be reassembled bc of theta_n
 
         # Create a dolfinx.fem.form for projecting CFL calculation onto DG function space
         cell_diam = ufl.CellDiameter(domain.fluid.msh)
@@ -788,8 +790,8 @@ class Flow:
 
         dolfinx.fem.petsc.set_bc(self.b6, self.bctemperature)
 
-        self.solver_6.solve(self.b6, self.theta_k1.vector)
-        self.theta_k1.x.scatter_forward()
+        self.solver_6.solve(self.b6, self.theta_k.vector)
+        self.theta_k.x.scatter_forward()
 
     def compute_cfl(self):
         """Solve for the CFL number
