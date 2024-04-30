@@ -66,6 +66,8 @@ class DataStream:
                 xdmf_file.write_function(flow.u_k, 0.0)
                 xdmf_file.write_function(flow.p_k, 0.0)
                 xdmf_file.write_function(flow.panel_stress, 0.0)
+                xdmf_file.write_function(flow.temperature_k, 0.0)
+                xdmf_file.write_function(flow.theta_k, 0.0)
                 xdmf_file.write_function(domain.total_mesh_displacement, 0.0)
 
         # If doing a structure simulation, start a structure solution file
@@ -151,6 +153,8 @@ class DataStream:
                 xdmf_file.write_function(fsi_object.u_k, tt)
                 xdmf_file.write_function(fsi_object.p_k, tt)
                 xdmf_file.write_function(fsi_object.panel_stress, tt)
+                xdmf_file.write_function(fsi_object.temperature_k, tt)
+                xdmf_file.write_function(fsi_object.theta_k, tt)
                 xdmf_file.write_function(domain.total_mesh_displacement, tt)
 
         elif fsi_object.name == "structure":

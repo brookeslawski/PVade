@@ -24,10 +24,12 @@ solver:
   solver2_ksp: gmres
   solver3_ksp: gmres
   solver4_ksp: gmres
+  solver6_ksp: gmres
   solver1_pc: hypre
   solver2_pc: hypre
   solver3_pc: hypre
   solver4_pc: hypre
+  solver6_pc: hypre
   save_text_interval: 0.02
   save_xdmf_interval: 0.02
 fluid:
@@ -41,6 +43,9 @@ fluid:
   bc_y_max: noslip # slip noslip free
   bc_y_min: noslip # slip noslip free
   # warm_up_time: 0.25 # slip noslip free
+  init_temperature_y_max: 0.0
+  init_temperature_y_min: 0.1
+  init_temperature_panel: 0.0
 structure:
   dt : 0.001 # 0.002
   # rho : 10000.0

@@ -345,3 +345,47 @@ def build_pressure_boundary_conditions(domain, params, functionspace):
     bcp.append(dolfinx.fem.dirichletbc(zero_scalar, dofs, functionspace))
 
     return bcp
+
+def build_temperature_boundary_conditions(self, domain, params, functionspace):
+    """Build all boundary conditions on temperature
+
+    This method builds all the boundary conditions associated with temperature and stores in a list, ``bctemperature``.
+
+    Args:
+        domain (:obj:`pvade.geometry.MeshManager.Domain`): A Domain object
+        params (:obj:`pvade.Parameters.SimParams`): A SimParams object
+    """
+    # non-dimensional temperature
+    T0_y_max = params.fluid.init_temperature_y_max
+    T0_y_min = params.fluid.init_temperature_y_min
+    if T0_y_min != T0_y_max:
+        self.DeltaT = (
+            T0_y_min - T0_y_max
+        )  # ? should this be defined as Constant(mesh, PETSc.ScalarType(bottom-top)) ?
+    else:
+        self.DeltaT = 1 # to avoid divide by zero errors; tested on neutral state and temps stay at zero through entire sim of 0.4s
+    # warning: the above logic produces different theta for the pv in neutral vs unstable ABL conditions; fix later
+
+    # non-dimensional reference temperature from Oeurtatani et al. 2008
+    self.T_r = 0.5*(T0_y_min + T0_y_max) 
+
+    # non-dim temperatures at top and bottom walls
+    theta0_y_min = (T0_y_min - self.T_r) / self.DeltaT # from Oeurtatani et al. 2008
+    theta0_y_max = (T0_y_max - self.T_r) / self.DeltaT # from Oeurtatani et al. 2008
+
+    # # Interpolate initial temperature vertically for a smooth gradient
+    # functionspace.interpolate(lambda x: (T0_y_min + (x[1] / params.domain.y_max) * (T0_y_max - T0_y_min)))
+
+    # Define pressure boundary conditions
+    bctemperature = []
+
+    theta0_y_min_scalar = dolfinx.fem.Constant(domain.fluid.msh, theta0_y_min)
+    theta0_y_max_scalar = dolfinx.fem.Constant(domain.fluid.msh, theta0_y_max)
+
+    dofs_y_max = get_facet_dofs_by_gmsh_tag(domain, functionspace, "y_max")
+    bctemperature.append(dolfinx.fem.dirichletbc(theta0_y_max_scalar, dofs_y_max, functionspace))
+
+    dofs = get_facet_dofs_by_gmsh_tag(domain, functionspace, "y_min")
+    bctemperature.append(dolfinx.fem.dirichletbc(theta0_y_min_scalar, dofs, functionspace))
+    
+    return bctemperature

@@ -30,6 +30,9 @@ def main(input_file=None):
     # Initialize the domain and construct the initial mesh
     domain = FSIDomain(params)
 
+    if domain.rank == 0:
+        print('fluids params = ', params.fluid)
+
     if params.general.input_mesh_dir is not None:
         domain.read_mesh_files(params.general.input_mesh_dir, params)
     else:
@@ -50,7 +53,7 @@ def main(input_file=None):
     elasticity = Elasticity(domain, structural_analysis, params)
 
     if fluid_analysis == True:
-        flow = Flow(domain, fluid_analysis)
+        flow = Flow(domain, fluid_analysis) # seems like this is being called twice?
         # # # Specify the boundary conditions
         flow.build_boundary_conditions(domain, params)
         # # # Build the fluid forms
