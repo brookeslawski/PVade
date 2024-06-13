@@ -171,7 +171,8 @@ else:
 # Pr = Constant(mesh, PETSc.ScalarType(0.7))
 
 # g = Constant(mesh, PETSc.ScalarType((0, 1)))
-g = Constant(mesh, PETSc.ScalarType((0, 9.81)))
+# g = Constant(mesh, PETSc.ScalarType((0, 9.81)))
+g = Constant(mesh, PETSc.ScalarType((0, 0)))
 
 # nu = Constant(mesh, PETSc.ScalarType(1))
 # nu = Constant(mesh, PETSc.ScalarType(15.89e-6)) # kinematic viscosity
@@ -310,6 +311,11 @@ T_r = Constant(mesh, PETSc.ScalarType(T_f))
 # T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
 T_n.x.array[:] = PETSc.ScalarType(T_f)
 
+# Set initial velocity?
+# u_n.x.array[:] = PETSc.ScalarType(0.0)
+# u_n.x[1].array[:] = PETSc.ScalarType(1.0)
+
+
 # non-dimensional temperature
 # theta_n.x.array[:] = (T_n.x.array[:] - T_r) / DeltaT # from Oeurtatani et al. 2008
 
@@ -419,6 +425,7 @@ L3 = form(inner(u_, v) * dx - (dt/rho) * inner(nabla_grad(p_), v) * dx) # u_ is 
 # )  # needs to be reassembled bc of u_
 # L4 = form((1 / dt) * inner((T_n), s) * dx)  # needs to be reassembled bc of T_n
 
+# how to print these terms?
 F4 = (1 / dt) * inner(theta - T_n, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
 F4 += alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx
 F4 += inner(dot(u_, nabla_grad(theta)), s) * dx
@@ -487,6 +494,8 @@ A4 = assemble_matrix(a4, bcs=bcT)
 A4.assemble()
 b4 = assemble_vector(L4)
 
+print('shape of T_n = ',np.shape(T_n.x.array[:]))
+
 while t < t_final + eps:
     # T_n.x.array[:] = DeltaT * theta_n.x.array[:] + T_r # from Ouertatani et al. 2008
     # T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
@@ -543,6 +552,10 @@ while t < t_final + eps:
     solver3.solve(b3, u_.vector)
     u_.x.scatter_forward()
 
+    print('T_.x.array[0:05] = ',T_.x.array[0:5]) # how to print theta?
+    print('T_n.x.array[0:5] = ',T_n.x.array[0:5])
+    print('u_.x.array[0:5] = ',u_.x.array[0:5])
+    
     # Step 4: Temperature corrrection step
     with b4.localForm() as loc_4:
         loc_4.set(0)
@@ -564,11 +577,11 @@ while t < t_final + eps:
     T_n_max = mesh.comm.allreduce(np.amax(T_n.vector.array), op=MPI.MAX)
     T_n_sum = mesh.comm.allreduce(np.sum(T_n.vector.array), op=MPI.SUM)
 
-    if ct % save_interval == 0:
-        print(
-            "Time = %.6f, u_max = %.6e, p_max = %.6e, T_max = %.6e, T_sum = %.6e"
-            % (t, u_n_max, p_n_max, T_n_max, T_n_sum)
-        )
+    # if ct % save_interval == 0:
+    #     print(
+    #         "Time = %.6f, u_max = %.6e, p_max = %.6e, T_max = %.6e, T_sum = %.6e"
+    #         % (t, u_n_max, p_n_max, T_n_max, T_n_sum)
+    #     )
 
     # Move to next step
     t += float(dt)
