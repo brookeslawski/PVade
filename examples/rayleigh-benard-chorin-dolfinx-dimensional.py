@@ -195,6 +195,7 @@ g = Constant(mesh, PETSc.ScalarType((0, 0)))
 # from Gasteuil et al 2007
 beta = Constant(mesh, PETSc.ScalarType(2.95e-4)) # [1/K] thermal expansion coefficient (also alpha)
 alpha = Constant(mesh, PETSc.ScalarType(1.48e-7)) # thermal diffusivity [m2/s]
+# alpha = Constant(mesh, PETSc.ScalarType(0.1)) # thermal diffusivity [m2/s]
 rho = Constant(mesh, PETSc.ScalarType(993.88)) # density [kg/m3]
 mu = Constant(mesh, PETSc.ScalarType(812.e-6)) # dynamic viscosity [Ns/m2]
 
@@ -456,11 +457,22 @@ pc3 = solver3.getPC()
 pc3.setType(PETSc.PC.Type.JACOBI)  # TODO - test solution with SOR
 
 # Solver for step 4
+# solver4 = PETSc.KSP().create(mesh.comm)
+# solver4.setType(PETSc.KSP.Type.GMRES)
+# pc4 = solver4.getPC()
+# pc4.setType(PETSc.PC.Type.HYPRE)
+# pc4.setHYPREType("boomeramg")
 solver4 = PETSc.KSP().create(mesh.comm)
-solver4.setType(PETSc.KSP.Type.GMRES)
+solver4.setType(PETSc.KSP.Type.PREONLY)
 pc4 = solver4.getPC()
-pc4.setType(PETSc.PC.Type.HYPRE)
-pc4.setHYPREType("boomeramg")
+pc4.setType(PETSc.PC.Type.LU)
+# pc4.setHYPREType("boomeramg")
+
+# solver = PETSc.KSP().create(domain.comm)
+# solver.setOperators(A)
+# solver.setType(PETSc.KSP.Type.PREONLY)
+# solver.getPC().setType(PETSc.PC.Type.LU)
+
 
 # ================================================================
 # Begin Time Iteration
@@ -499,12 +511,11 @@ print('shape of T_n = ',np.shape(T_n.x.array[:]))
 while t < t_final + eps:
     # T_n.x.array[:] = DeltaT * theta_n.x.array[:] + T_r # from Ouertatani et al. 2008
     # T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
-
-    with io.XDMFFile(mesh.comm, save_fn+".xdmf", "a") as xdmf:
-        xdmf.write_function(u_n, t)
-        xdmf.write_function(p_n, t)
-        xdmf.write_function(T_n, t)
-        # xdmf.write_function(theta_n, t)
+ 
+    # alpha.value = alpha.value*0.9
+    # if alpha.value < 1e-7:
+    #     alpha.value = 1e-7
+    # print('alpha = ',alpha.value)
 
     # ================================================================
     # Assemble and Build Solvers
@@ -577,11 +588,17 @@ while t < t_final + eps:
     T_n_max = mesh.comm.allreduce(np.amax(T_n.vector.array), op=MPI.MAX)
     T_n_sum = mesh.comm.allreduce(np.sum(T_n.vector.array), op=MPI.SUM)
 
-    # if ct % save_interval == 0:
-    #     print(
-    #         "Time = %.6f, u_max = %.6e, p_max = %.6e, T_max = %.6e, T_sum = %.6e"
-    #         % (t, u_n_max, p_n_max, T_n_max, T_n_sum)
-    #     )
+    with io.XDMFFile(mesh.comm, save_fn+".xdmf", "a") as xdmf:
+        xdmf.write_function(u_n, t)
+        xdmf.write_function(p_n, t)
+        xdmf.write_function(T_n, t)
+        # xdmf.write_function(theta_n, t)
+
+    if ct % save_interval == 0:
+        print(
+            "Time = %.6f, u_max = %.6e, p_max = %.6e, T_max = %.6e, T_sum = %.6e"
+            % (t, u_n_max, p_n_max, T_n_max, T_n_sum)
+        )
 
     # Move to next step
     t += float(dt)
