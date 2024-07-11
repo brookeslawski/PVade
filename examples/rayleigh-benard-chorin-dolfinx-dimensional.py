@@ -81,9 +81,9 @@ T_f = T_avg # (deltaT/2.)+T0_top_wall
 
 pv_panel_flag = False  # empty domain or with a pv panel in the center?
 
-save_fn = 'empty_Gastueil2007'
-t_final = 0.4 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
-dt_num = 0.001
+save_fn = 'empty_Gastueil2007_newpreconditioner'
+t_final = 100.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+dt_num = 0.01 #0.001
 # ================================================================
 # Build Mesh
 # ================================================================
@@ -171,8 +171,8 @@ else:
 # Pr = Constant(mesh, PETSc.ScalarType(0.7))
 
 # g = Constant(mesh, PETSc.ScalarType((0, 1)))
-# g = Constant(mesh, PETSc.ScalarType((0, 9.81)))
-g = Constant(mesh, PETSc.ScalarType((0, 0)))
+g = Constant(mesh, PETSc.ScalarType((0, 9.81)))
+# g = Constant(mesh, PETSc.ScalarType((0, 0)))
 
 # nu = Constant(mesh, PETSc.ScalarType(1))
 # nu = Constant(mesh, PETSc.ScalarType(15.89e-6)) # kinematic viscosity
