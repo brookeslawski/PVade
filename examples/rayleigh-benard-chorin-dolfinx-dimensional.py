@@ -64,8 +64,8 @@ y_min = 0.0
 y_max = 0.4 #1.0 #3.0
 
 # h = 0.05
-nx = 50 # 100 # 100 # 50  # 150 # int((x_max - x_min)/h)
-ny = 50 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min)/h)
+nx = 40 # 50 # 100 # 100 # 50  # 150 # int((x_max - x_min)/h)
+ny = 40 # 50 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min)/h)
 
 # values from Example 9.1 in Incropera
 # T0_top_wall = 25+273.15 # 300.0 # 300.000 # 0
@@ -81,8 +81,8 @@ T_f = T_avg # (deltaT/2.)+T0_top_wall
 
 pv_panel_flag = False  # empty domain or with a pv panel in the center?
 
-save_fn = 'empty_Gastueil2007_newpreconditioner'
-t_final = 100.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+save_fn = 'empty_Gastueil2007_allnewsolvers_highdiffus_gravon'
+t_final = 50.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
 dt_num = 0.01 #0.001
 # ================================================================
 # Build Mesh
@@ -171,7 +171,8 @@ else:
 # Pr = Constant(mesh, PETSc.ScalarType(0.7))
 
 # g = Constant(mesh, PETSc.ScalarType((0, 1)))
-g = Constant(mesh, PETSc.ScalarType((0, 9.81)))
+# g = Constant(mesh, PETSc.ScalarType((0, 9.81)))
+g = Constant(mesh, PETSc.ScalarType((0, 98.1)))
 # g = Constant(mesh, PETSc.ScalarType((0, 0)))
 
 # nu = Constant(mesh, PETSc.ScalarType(1))
@@ -194,8 +195,8 @@ g = Constant(mesh, PETSc.ScalarType((0, 9.81)))
 
 # from Gasteuil et al 2007
 beta = Constant(mesh, PETSc.ScalarType(2.95e-4)) # [1/K] thermal expansion coefficient (also alpha)
-alpha = Constant(mesh, PETSc.ScalarType(1.48e-7)) # thermal diffusivity [m2/s]
-# alpha = Constant(mesh, PETSc.ScalarType(0.1)) # thermal diffusivity [m2/s]
+# alpha = Constant(mesh, PETSc.ScalarType(1.48e-7)) # thermal diffusivity [m2/s]
+alpha = Constant(mesh, PETSc.ScalarType(0.1)) # thermal diffusivity [m2/s]
 rho = Constant(mesh, PETSc.ScalarType(993.88)) # density [kg/m3]
 mu = Constant(mesh, PETSc.ScalarType(812.e-6)) # dynamic viscosity [Ns/m2]
 
@@ -311,6 +312,7 @@ T_r = Constant(mesh, PETSc.ScalarType(T_f))
 # Interpolate initial temperature vertically for a smooth gradient
 # T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
 T_n.x.array[:] = PETSc.ScalarType(T_f)
+# theta_n.x.array[:] = PETSc.ScalarType(T_f)
 
 # Set initial velocity?
 # u_n.x.array[:] = PETSc.ScalarType(0.0)
@@ -402,7 +404,9 @@ bcp = []  # [bcp_left_wall, bcp_right_wall, bcp_bottom_wall, bcp_top_wall]
 # F1 += beta * inner((T_n-T_r) * g, v) * dx
 
 # using rho and mu
-F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(dot(u_n, nabla_grad(u_n)), v) * dx
+# F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(dot(u_n, nabla_grad(u_n)), v) * dx
+# F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(nabla_grad(u_n) * u_n, v) * dx
+F1 = rho * ((1 / dt) * inner(u - u_n, v) * dx + rho * inner(nabla_grad(u_n) * u_n, v) * dx )
 # F1 += mu * inner(div(grad(u)), (v)) * dx
 F1 += mu * inner(nabla_grad(u), nabla_grad(v)) * dx
 F1 -= beta * inner((T_n-T_r) * g, v) * dx
@@ -418,43 +422,65 @@ L2 = form(-(rho / dt) * div(u_) * q * dx)  # needs to be reassembled
 a3 = form(inner(u, v) * dx)  # doesn't need to be reassembled
 L3 = form(inner(u_, v) * dx - (dt/rho) * inner(nabla_grad(p_), v) * dx) # u_ is known
 
-# step 4: temperature update?
-# a4 = form(
-#     (1 / dt) * inner(theta, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
-#     + alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx
-#     + inner(dot(u_, nabla_grad(theta)), s) * dx
-# )  # needs to be reassembled bc of u_
-# L4 = form((1 / dt) * inner((T_n), s) * dx)  # needs to be reassembled bc of T_n
+# step 4: temperature update
+a4 = form(
+    (1 / dt) * inner(theta, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
+    + alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx
+    + inner(dot(u_, nabla_grad(theta)), s) * dx
+)  # needs to be reassembled bc of u_
+L4 = form((1 / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
 
 # how to print these terms?
-F4 = (1 / dt) * inner(theta - T_n, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
-F4 += alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx
-F4 += inner(dot(u_, nabla_grad(theta)), s) * dx
+# F4 = (1 / dt) * inner(theta - T_n, s) * dx # theta = unknown, T_n = temp from previous timestep
+# F4 += alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx
+# F4 += inner(dot(u_, nabla_grad(theta)), s) * dx
 
-a4 = form(lhs(F4))  # dependent on u
-L4 = form(rhs(F4))
+# a4 = form(lhs(F4))  # dependent on u
+# L4 = form(rhs(F4))
 
 # (1/dt) * inner(T - T_, v)*dx = -inner(dot(u_, grad(T)), v)*dx -K*inner(grad(T), grad(v))*dx
 
 # Solver for step 1
+# solver1 = PETSc.KSP().create(mesh.comm)
+# solver1.setType(PETSc.KSP.Type.GMRES)  # TODO - test solution with BCGS
+# pc1 = solver1.getPC()
+# pc1.setType(PETSc.PC.Type.HYPRE)
+# pc1.setHYPREType("boomeramg")
+
+# copied from Nav Stokes tutorial: https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code2.html
 solver1 = PETSc.KSP().create(mesh.comm)
-solver1.setType(PETSc.KSP.Type.GMRES)  # TODO - test solution with BCGS
+# solver1.setOperators(A1)
+solver1.setType(PETSc.KSP.Type.BCGS)
 pc1 = solver1.getPC()
-pc1.setType(PETSc.PC.Type.HYPRE)
-pc1.setHYPREType("boomeramg")
+pc1.setType(PETSc.PC.Type.JACOBI)
 
 # Solver for step 2
+# solver2 = PETSc.KSP().create(mesh.comm)
+# solver2.setType(PETSc.KSP.Type.GMRES)  # TODO - test solution with BCGS
+# pc2 = solver2.getPC()
+# pc2.setType(PETSc.PC.Type.HYPRE)
+# # pc2.setHYPREType("boomeramg") # TODO - test solution with this instead (for speed?)
+
+# copied from Nav Stokes tutorial: https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code2.html
 solver2 = PETSc.KSP().create(mesh.comm)
-solver2.setType(PETSc.KSP.Type.GMRES)  # TODO - test solution with BCGS
+# solver2.setOperators(A2)
+solver2.setType(PETSc.KSP.Type.MINRES)
 pc2 = solver2.getPC()
 pc2.setType(PETSc.PC.Type.HYPRE)
-# pc2.setHYPREType("boomeramg") # TODO - test solution with this instead (for speed?)
+pc2.setHYPREType("boomeramg")
 
 # Solver for step 3
+# solver3 = PETSc.KSP().create(mesh.comm)
+# solver3.setType(PETSc.KSP.Type.GMRES)
+# pc3 = solver3.getPC()
+# pc3.setType(PETSc.PC.Type.JACOBI)  # TODO - test solution with SOR
+
+# copied from Nav Stokes tutorial: https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code2.html
 solver3 = PETSc.KSP().create(mesh.comm)
-solver3.setType(PETSc.KSP.Type.GMRES)
+# solver3.setOperators(A3)
+solver3.setType(PETSc.KSP.Type.CG)
 pc3 = solver3.getPC()
-pc3.setType(PETSc.PC.Type.JACOBI)  # TODO - test solution with SOR
+pc3.setType(PETSc.PC.Type.SOR)
 
 # Solver for step 4
 # solver4 = PETSc.KSP().create(mesh.comm)
@@ -562,10 +588,9 @@ while t < t_final + eps:
     b3.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
     solver3.solve(b3, u_.vector)
     u_.x.scatter_forward()
-
-    print('T_.x.array[0:05] = ',T_.x.array[0:5]) # how to print theta?
-    print('T_n.x.array[0:5] = ',T_n.x.array[0:5])
-    print('u_.x.array[0:5] = ',u_.x.array[0:5])
+    # print('T_.x.array[0:05] = ',T_.x.array[0:5]) # how to print theta?
+    # print('T_n.x.array[0:5] = ',T_n.x.array[0:5])
+    # print('u_.x.array[0:5] = ',u_.x.array[0:5])
     
     # Step 4: Temperature corrrection step
     with b4.localForm() as loc_4:
@@ -577,10 +602,11 @@ while t < t_final + eps:
     solver4.solve(b4, T_.vector)
     T_.x.scatter_forward()
 
-    # Update variable with solution form this time step
+    # Update variable with solution from this time step
     u_n.x.array[:] = u_.x.array[:]
     p_n.x.array[:] = p_.x.array[:]
     T_n.x.array[:] = T_.x.array[:]
+    # theta_n.x.array[:] = theta.x.array[:]
 
     # print(T_n.x.array[:])
     u_n_max = mesh.comm.allreduce(np.amax(u_n.vector.array), op=MPI.MAX)

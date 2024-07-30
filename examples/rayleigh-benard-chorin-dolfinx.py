@@ -72,7 +72,7 @@ T0_pv_panel = 0 # only used if pv_panel_flag == True
 
 pv_panel_flag = False  # empty domain or with a pv panel in the center?
 
-save_fn = 'empty_test_unstable'
+save_fn = 'ND_empty_test_gravon'
 t_final = 0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
 
 # ================================================================
@@ -157,6 +157,8 @@ else:
 
 # Ra = Constant(1e8)
 Ra = Constant(mesh, PETSc.ScalarType(1e5))
+# Ra = Constant(mesh, PETSc.ScalarType(0))
+
 # Ra = Constant(mesh, PETSc.ScalarType(2500))
 
 Pr = Constant(mesh, PETSc.ScalarType(0.7))
@@ -165,7 +167,7 @@ n = Constant(mesh, PETSc.ScalarType((0, 1)))
 
 nu = Constant(mesh, PETSc.ScalarType(1))
 
-dt_num = 0.0001
+dt_num = 0.001 # 0.0001
 dt = Constant(mesh, PETSc.ScalarType(dt_num))
 
 # ================================================================
