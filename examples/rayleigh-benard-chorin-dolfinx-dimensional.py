@@ -81,8 +81,8 @@ T_f = T_avg # (deltaT/2.)+T0_top_wall
 
 pv_panel_flag = False  # empty domain or with a pv panel in the center?
 
-save_fn = 'empty_Gastueil2007_allnewsolvers_highdiffus_gravon'
-t_final = 50.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+save_fn = 'empty_Gastueil2007_allnewsolvers_gravon'
+t_final = 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
 dt_num = 0.01 #0.001
 # ================================================================
 # Build Mesh
@@ -171,8 +171,10 @@ else:
 # Pr = Constant(mesh, PETSc.ScalarType(0.7))
 
 # g = Constant(mesh, PETSc.ScalarType((0, 1)))
-# g = Constant(mesh, PETSc.ScalarType((0, 9.81)))
-g = Constant(mesh, PETSc.ScalarType((0, 98.1)))
+g = Constant(mesh, PETSc.ScalarType((0, 9.81)))
+# g = Constant(mesh, PETSc.ScalarType((0, 981.)))
+# g = Constant(mesh, PETSc.ScalarType((0, 98000000.1)))
+# g = Constant(mesh, PETSc.ScalarType((0, 4900000.)))
 # g = Constant(mesh, PETSc.ScalarType((0, 0)))
 
 # nu = Constant(mesh, PETSc.ScalarType(1))
@@ -193,12 +195,25 @@ g = Constant(mesh, PETSc.ScalarType((0, 98.1)))
 # mu = Constant(mesh, PETSc.ScalarType(184.6e-7)) # dynamic viscosity [Ns/m2]
 # mu = Constant(mesh, PETSc.ScalarType(196.4e-7)) # dynamic viscosity [Ns/m2]
 
-# from Gasteuil et al 2007
-beta = Constant(mesh, PETSc.ScalarType(2.95e-4)) # [1/K] thermal expansion coefficient (also alpha)
+# calc alpha from Incropera for water at 300 K
+k_f = 613*10**(-3) # W/m*K
+rho_f = 993.88 #998.57 # kg/m3
+cp_f = 4.179*1000 # J/kg*K
+alpha_f = k_f/(rho_f*cp_f) # m2/s
+print('alpha = ',alpha_f)
+
+# from Gasteuil et al 2007 and Incropera
+# beta = Constant(mesh, PETSc.ScalarType(2.95e-4)) # [1/K] thermal expansion coefficient (also alpha)
+beta = Constant(mesh, PETSc.ScalarType(2.76e-4)) # [1/K] thermal expansion coefficient
 # alpha = Constant(mesh, PETSc.ScalarType(1.48e-7)) # thermal diffusivity [m2/s]
-alpha = Constant(mesh, PETSc.ScalarType(0.1)) # thermal diffusivity [m2/s]
+alpha = Constant(mesh, PETSc.ScalarType(alpha_f)) # thermal diffusivity [m2/s]
+# alpha = Constant(mesh, PETSc.ScalarType(0.1)) # thermal diffusivity [m2/s]
 rho = Constant(mesh, PETSc.ScalarType(993.88)) # density [kg/m3]
-mu = Constant(mesh, PETSc.ScalarType(812.e-6)) # dynamic viscosity [Ns/m2]
+cp = Constant(mesh, PETSc.ScalarType(cp_f)) # [J/kg*K]
+k = Constant(mesh, PETSc.ScalarType(k_f)) # [W/m*K]
+# mu = Constant(mesh, PETSc.ScalarType(812.e-6)) # dynamic viscosity [Ns/m2]
+mu = Constant(mesh, PETSc.ScalarType(8.55e-4)) # dynamic viscosity [Ns/m2]
+nu = Constant(mesh, PETSc.ScalarType(8.6026e-07)) # kinematic viscosity [m3/kg]
 
 dt = Constant(mesh, PETSc.ScalarType(dt_num))
 
@@ -398,18 +413,21 @@ bcp = []  # [bcp_left_wall, bcp_right_wall, bcp_bottom_wall, bcp_top_wall]
 # F1 += nu * inner(nabla_grad(u), nabla_grad(v)) * dx
 # F1 -= Ra * inner(theta_n * g, v) * dx
 
-# using nu and beta
-# F1 = (1 / dt) * inner(u - u_n, v) * dx + inner(nabla_grad(u_n) * u_n, v) * dx
-# F1 += nu * inner(nabla_grad(u), nabla_grad(v)) * dx
-# F1 += beta * inner((T_n-T_r) * g, v) * dx
+# using nu
+# # # F1 = (1 / dt) * inner(u - u_n, v) * dx + inner(nabla_grad(u_n) * u_n, v) * dx
+# # # F1 += nu * inner(nabla_grad(u), nabla_grad(v)) * dx
+# # # F1 += beta * inner((T_n-T_r) * g, v) * dx
+# F1 = (1 / dt) * inner(u - u_n, v) * dx + inner(dot(u_n, nabla_grad(u_n)), v) * dx
+# F1 -= nu * inner(nabla_grad(u), nabla_grad(v)) * dx
+# F1 -= beta * inner((T_n-T_r) * g, v) * dx
 
 # using rho and mu
-# F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(dot(u_n, nabla_grad(u_n)), v) * dx
-# F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(nabla_grad(u_n) * u_n, v) * dx
-F1 = rho * ((1 / dt) * inner(u - u_n, v) * dx + rho * inner(nabla_grad(u_n) * u_n, v) * dx )
-# F1 += mu * inner(div(grad(u)), (v)) * dx
-F1 += mu * inner(nabla_grad(u), nabla_grad(v)) * dx
-F1 -= beta * inner((T_n-T_r) * g, v) * dx
+F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(dot(u_n, nabla_grad(u_n)), v) * dx # convection
+# # F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(nabla_grad(u_n) * u_n, v) * dx
+# # F1 = rho * ((1 / dt) * inner(u - u_n, v) * dx + rho * inner(nabla_grad(u_n) * u_n, v) * dx )
+# # F1 += mu * inner(div(grad(u)), (v)) * dx
+F1 -= mu * inner(nabla_grad(u), nabla_grad(v)) * dx # viscosity # + or - ??
+F1 -= rho * beta * inner((T_n-T_r) * g, v) * dx # buoyancy
 
 a1 = form(lhs(F1))  # dependent on u
 L1 = form(rhs(F1))
@@ -417,18 +435,28 @@ L1 = form(rhs(F1))
 # step 2: pressure correction
 a2 = form(inner(nabla_grad(p), nabla_grad(q)) * dx)
 L2 = form(-(rho / dt) * div(u_) * q * dx)  # needs to be reassembled
+# L2 = form(-(1 / dt) * div(u_) * q * dx)  # needs to be reassembled
 
 # step 3: velocity update
 a3 = form(inner(u, v) * dx)  # doesn't need to be reassembled
 L3 = form(inner(u_, v) * dx - (dt/rho) * inner(nabla_grad(p_), v) * dx) # u_ is known
+# L3 = form(inner(u_, v) * dx - dt * inner(nabla_grad(p_), v) * dx) # u_ is known
 
 # step 4: temperature update
-a4 = form(
-    (1 / dt) * inner(theta, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
-    + alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx
-    + inner(dot(u_, nabla_grad(theta)), s) * dx
-)  # needs to be reassembled bc of u_
-L4 = form((1 / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
+# a4 = form(
+#     (1 / dt) * inner(theta, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
+#     + alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx # diffusivity
+#     + inner(dot(u_, nabla_grad(theta)), s) * dx # advection of temperature
+# )  # needs to be reassembled bc of u_
+# L4 = form((1 / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
+
+# rho cp and k - wait I don't know about the dts in here
+# a4 = form(
+#     (rho*cp / dt) * inner(theta, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
+#     + alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx # diffusivity
+#     + rho*cp * inner(dot(u_, nabla_grad(theta)), s) * dx # advection of temperature
+# )  # needs to be reassembled bc of u_
+# L4 = form((rho*cp / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
 
 # how to print these terms?
 # F4 = (1 / dt) * inner(theta - T_n, s) * dx # theta = unknown, T_n = temp from previous timestep
@@ -437,6 +465,14 @@ L4 = form((1 / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
 
 # a4 = form(lhs(F4))  # dependent on u
 # L4 = form(rhs(F4))
+
+#rho cp k
+F4 = ((rho*cp) / dt) * inner(theta - T_n, s) * dx # theta = unknown, T_n = temp from previous timestep
+F4 -= k * inner(nabla_grad(theta), nabla_grad(s)) * dx # diffusion
+F4 += (rho*cp) * inner(dot(u_, nabla_grad(theta)), s) * dx # advection
+
+a4 = form(lhs(F4))  # dependent on u
+L4 = form(rhs(F4))
 
 # (1/dt) * inner(T - T_, v)*dx = -inner(dot(u_, grad(T)), v)*dx -K*inner(grad(T), grad(v))*dx
 
