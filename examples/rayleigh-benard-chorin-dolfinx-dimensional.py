@@ -171,7 +171,7 @@ else:
 # Pr = Constant(mesh, PETSc.ScalarType(0.7))
 
 # g = Constant(mesh, PETSc.ScalarType((0, 1)))
-g = Constant(mesh, PETSc.ScalarType((0, 9.81)))
+g = Constant(mesh, PETSc.ScalarType((0, -9.81)))
 # g = Constant(mesh, PETSc.ScalarType((0, 981.)))
 # g = Constant(mesh, PETSc.ScalarType((0, 98000000.1)))
 # g = Constant(mesh, PETSc.ScalarType((0, 4900000.)))
@@ -213,7 +213,7 @@ cp = Constant(mesh, PETSc.ScalarType(cp_f)) # [J/kg*K]
 k = Constant(mesh, PETSc.ScalarType(k_f)) # [W/m*K]
 # mu = Constant(mesh, PETSc.ScalarType(812.e-6)) # dynamic viscosity [Ns/m2]
 mu = Constant(mesh, PETSc.ScalarType(8.55e-4)) # dynamic viscosity [Ns/m2]
-nu = Constant(mesh, PETSc.ScalarType(8.6026e-07)) # kinematic viscosity [m3/kg]
+# nu = Constant(mesh, PETSc.ScalarType(8.6026e-07)) # kinematic viscosity [m3/kg]
 
 dt = Constant(mesh, PETSc.ScalarType(dt_num))
 
@@ -422,9 +422,9 @@ bcp = []  # [bcp_left_wall, bcp_right_wall, bcp_bottom_wall, bcp_top_wall]
 # F1 -= beta * inner((T_n-T_r) * g, v) * dx
 
 # using rho and mu
-F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(dot(u_n, nabla_grad(u_n)), v) * dx # convection
-# # F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(nabla_grad(u_n) * u_n, v) * dx
-# # F1 = rho * ((1 / dt) * inner(u - u_n, v) * dx + rho * inner(nabla_grad(u_n) * u_n, v) * dx )
+# F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(dot(u_n, nabla_grad(u_n)), v) * dx # convection
+# # F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(nabla_grad(u_n) * u_n, v) * dx # convection
+F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * (inner(nabla_grad(u_n) * u_n, v) * dx ) # convection
 # # F1 += mu * inner(div(grad(u)), (v)) * dx
 F1 -= mu * inner(nabla_grad(u), nabla_grad(v)) * dx # viscosity # + or - ??
 F1 -= rho * beta * inner((T_n-T_r) * g, v) * dx # buoyancy
@@ -443,12 +443,12 @@ L3 = form(inner(u_, v) * dx - (dt/rho) * inner(nabla_grad(p_), v) * dx) # u_ is 
 # L3 = form(inner(u_, v) * dx - dt * inner(nabla_grad(p_), v) * dx) # u_ is known
 
 # step 4: temperature update
-# a4 = form(
-#     (1 / dt) * inner(theta, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
-#     + alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx # diffusivity
-#     + inner(dot(u_, nabla_grad(theta)), s) * dx # advection of temperature
-# )  # needs to be reassembled bc of u_
-# L4 = form((1 / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
+a4 = form(
+    (1 / dt) * inner(theta, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
+    + alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx # diffusivity
+    + inner(dot(u_, nabla_grad(theta)), s) * dx # advection of temperature
+)  # needs to be reassembled bc of u_
+L4 = form((1 / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
 
 # rho cp and k - wait I don't know about the dts in here
 # a4 = form(
@@ -467,12 +467,12 @@ L3 = form(inner(u_, v) * dx - (dt/rho) * inner(nabla_grad(p_), v) * dx) # u_ is 
 # L4 = form(rhs(F4))
 
 #rho cp k
-F4 = ((rho*cp) / dt) * inner(theta - T_n, s) * dx # theta = unknown, T_n = temp from previous timestep
-F4 -= k * inner(nabla_grad(theta), nabla_grad(s)) * dx # diffusion
-F4 += (rho*cp) * inner(dot(u_, nabla_grad(theta)), s) * dx # advection
+# F4 = ((rho*cp) / dt) * inner(theta - T_n, s) * dx # theta = unknown, T_n = temp from previous timestep
+# F4 -= k * inner(nabla_grad(theta), nabla_grad(s)) * dx # diffusion
+# F4 += (rho*cp) * inner(dot(u_, nabla_grad(theta)), s) * dx # advection
 
-a4 = form(lhs(F4))  # dependent on u
-L4 = form(rhs(F4))
+# a4 = form(lhs(F4))  # dependent on u
+# L4 = form(rhs(F4))
 
 # (1/dt) * inner(T - T_, v)*dx = -inner(dot(u_, grad(T)), v)*dx -K*inner(grad(T), grad(v))*dx
 
