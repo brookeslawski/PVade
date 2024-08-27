@@ -51,6 +51,8 @@ from ufl import (
     grad,
     rhs,
     sym,
+    sqrt,
+    CellDiameter,
 )
 
 # ================================================================
@@ -79,10 +81,11 @@ T_avg = (T0_top_wall+T0_bottom_wall)/2.
 T_f = T_avg # (deltaT/2.)+T0_top_wall
 # ^ these are equivalent
 
+stabilizing = False
 pv_panel_flag = False  # empty domain or with a pv panel in the center?
 
-save_fn = 'empty_Gastueil2007_allnewsolvers_gravon_SUPGstab'
-t_final = 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+save_fn = 'empty_Gastueil2007_allnewsolvers_gravon_SUPGon'
+t_final = 0.1 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
 dt_num = 0.01 #0.001
 # ================================================================
 # Build Mesh
@@ -329,6 +332,8 @@ T_r = Constant(mesh, PETSc.ScalarType(T_f))
 T_n.x.array[:] = PETSc.ScalarType(T_f)
 # theta_n.x.array[:] = PETSc.ScalarType(T_f)
 
+u_.x.array[:] = PETSc.ScalarType(1.0)
+
 # Set initial velocity?
 # u_n.x.array[:] = PETSc.ScalarType(0.0)
 # u_n.x[1].array[:] = PETSc.ScalarType(1.0)
@@ -442,24 +447,17 @@ a3 = form(inner(u, v) * dx)  # doesn't need to be reassembled
 L3 = form(inner(u_, v) * dx - (dt/rho) * inner(nabla_grad(p_), v) * dx) # u_ is known
 # L3 = form(inner(u_, v) * dx - dt * inner(nabla_grad(p_), v) * dx) # u_ is known
 
-# step 4: temperature
-a4 = form(
-    (1 / dt) * inner(theta, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
-    + alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx # diffusivity
-    + inner(dot(u_, nabla_grad(theta)), s) * dx # advection of temperature
-)  # needs to be reassembled bc of u_
-L4 = form((1 / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
+
+# # step 4: temperature
+# a4 = form(
+#     (1 / dt) * inner(theta, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
+#     + alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx # diffusivity
+#     + inner(dot(u_, nabla_grad(theta)), s) * dx # advection of temperature
+#     + stab
+# )  # needs to be reassembled bc of u_
+# L4 = form((1 / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
 
 
-# Add SUPG stabilisation terms 
-# https://fenicsproject.org/qa/13458/how-implement-supg-properly-advection-dominated-equation/
-u_mid = 0.5*(u_ + u_n)
-vnorm = (dot(u_, u_))**(0.5)
-h = 1. / nx # CellSize(mesh)
-tau = h/(2.0*vnorm) # tau from SUPG fenics example
-#tau = pow(1/(0.5*dt) + 2.0*vnorm/h + 4*c/pow(h,2.0),-1) # tau from
-# r = u - u_n + dt*(dot(u_, grad(u_mid)) - c*div(grad(u_mid))) # ?? # Residual
-a4 += tau*dot(u_, grad(v)) * r*dx
 
 # rho cp and k - wait I don't know about the dts in here
 # a4 = form(
@@ -469,13 +467,32 @@ a4 += tau*dot(u_, grad(v)) * r*dx
 # )  # needs to be reassembled bc of u_
 # L4 = form((rho*cp / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
 
-# how to print these terms?
-# F4 = (1 / dt) * inner(theta - T_n, s) * dx # theta = unknown, T_n = temp from previous timestep
-# F4 += alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx
-# F4 += inner(dot(u_, nabla_grad(theta)), s) * dx
+# Residual, think this is just writing the "strong" governing equation?
+# # T_mid = 0.5*(T_n + theta) # Crank-Nicholsen for temperature??
+# r = (1 / dt)*(theta - T_n) + dot(u_, nabla_grad(theta)) - alpha*div(grad(theta))
+# # r = (1 / dt)*(theta - T_n) - alpha*div(grad(theta))
+# # r = dot(u_, nabla_grad(theta)) - alpha*div(grad(theta))
+# # r = -alpha*div(grad(theta))
+# # r = 1.0
 
-# a4 = form(lhs(F4))  # dependent on u
-# L4 = form(rhs(F4))
+# how to print these terms?
+F4 = (1 / dt) * inner(theta - T_n, s) * dx # theta = unknown, T_n = temp from previous timestep
+F4 += alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx
+F4 += inner(dot(u_, nabla_grad(theta)), s) * dx
+
+if stabilizing:
+    # Add SUPG stabilisation terms 
+    # https://fenicsproject.org/qa/13458/how-implement-supg-properly-advection-dominated-equation/
+    vnorm = sqrt(dot(u_, u_))
+    h = CellDiameter(mesh)
+    delta = h/(2.0*vnorm)
+    stab = delta * dot(u_, grad(s)) * r * dx
+    # stab = 0.0
+
+    F4 += stab
+
+a4 = form(lhs(F4))  # dependent on u
+L4 = form(rhs(F4))
 
 #rho cp k
 # F4 = ((rho*cp) / dt) * inner(theta - T_n, s) * dx # theta = unknown, T_n = temp from previous timestep
@@ -530,16 +547,25 @@ pc3 = solver3.getPC()
 pc3.setType(PETSc.PC.Type.SOR)
 
 # Solver for step 4
+# # solver4 = PETSc.KSP().create(mesh.comm)
+# # solver4.setType(PETSc.KSP.Type.GMRES)
+# # pc4 = solver4.getPC()
+# # pc4.setType(PETSc.PC.Type.HYPRE)
+# # pc4.setHYPREType("boomeramg")
 # solver4 = PETSc.KSP().create(mesh.comm)
-# solver4.setType(PETSc.KSP.Type.GMRES)
+# solver4.setType(PETSc.KSP.Type.PREONLY)
 # pc4 = solver4.getPC()
-# pc4.setType(PETSc.PC.Type.HYPRE)
-# pc4.setHYPREType("boomeramg")
+# pc4.setType(PETSc.PC.Type.LU)
+# # pc4.setHYPREType("boomeramg")
 solver4 = PETSc.KSP().create(mesh.comm)
 solver4.setType(PETSc.KSP.Type.PREONLY)
 pc4 = solver4.getPC()
 pc4.setType(PETSc.PC.Type.LU)
-# pc4.setHYPREType("boomeramg")
+# solver1 = PETSc.KSP().create(mesh.comm)
+# # solver1.setOperators(A1)
+# solver1.setType(PETSc.KSP.Type.BCGS)
+# pc1 = solver1.getPC()
+# pc1.setType(PETSc.PC.Type.JACOBI)
 
 # solver = PETSc.KSP().create(domain.comm)
 # solver.setOperators(A)
