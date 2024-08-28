@@ -74,6 +74,10 @@ ny = 40 # 50 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min
 # T0_bottom_wall = 70.+273.15 # 300.00109 # 0 #1
 T0_top_wall = 19+273.15 # 320.50 # 300.000 # 0
 T0_bottom_wall = 39.3+273.15 # 320.5007685957619775737  #300.00109 # 0 #1
+
+# T0_top_wall = 39+273.15 # 320.50 # 300.000 # 0
+# T0_bottom_wall = 19+273.15 # 320.5007685957619775737  #300.00109 # 0 #1
+
 T0_pv_panel = 0 # only used if pv_panel_flag == True
 
 # deltaT = T0_bottom_wall - T0_top_wall
@@ -84,9 +88,9 @@ T_f = T_avg # (deltaT/2.)+T0_top_wall
 stabilizing = False
 pv_panel_flag = False  # empty domain or with a pv panel in the center?
 
-save_fn = 'empty_Gastueil2007_allnewsolvers_gravon_SUPGon'
-t_final = 0.1 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
-dt_num = 0.01 #0.001
+save_fn = 'empty_Gastueil2007_allnewsolvers_gravon_SUPGoff'
+t_final = 1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+dt_num = 0.005 # 0.01 #0.001
 # ================================================================
 # Build Mesh
 # ================================================================
@@ -174,7 +178,7 @@ else:
 # Pr = Constant(mesh, PETSc.ScalarType(0.7))
 
 # g = Constant(mesh, PETSc.ScalarType((0, 1)))
-g = Constant(mesh, PETSc.ScalarType((0, -9.81))) # negative?
+g = Constant(mesh, PETSc.ScalarType((0, 9.81))) # negative?
 # g = Constant(mesh, PETSc.ScalarType((0, 981.)))
 # g = Constant(mesh, PETSc.ScalarType((0, 98000000.1)))
 # g = Constant(mesh, PETSc.ScalarType((0, 4900000.)))
@@ -209,8 +213,9 @@ print('alpha = ',alpha_f)
 # beta = Constant(mesh, PETSc.ScalarType(2.95e-4)) # [1/K] thermal expansion coefficient (also alpha)
 beta = Constant(mesh, PETSc.ScalarType(2.76e-4)) # [1/K] thermal expansion coefficient
 # alpha = Constant(mesh, PETSc.ScalarType(1.48e-7)) # thermal diffusivity [m2/s]
-alpha = Constant(mesh, PETSc.ScalarType(alpha_f)) # thermal diffusivity [m2/s]
-# alpha = Constant(mesh, PETSc.ScalarType(0.1)) # thermal diffusivity [m2/s]
+# alpha = Constant(mesh, PETSc.ScalarType(alpha_f)) # thermal diffusivity [m2/s]
+# alpha = Constant(mesh, PETSc.ScalarType(10.0)) # thermal diffusivity [m2/s]
+alpha = Constant(mesh, PETSc.ScalarType(0.001)) # thermal diffusivity [m2/s]
 rho = Constant(mesh, PETSc.ScalarType(993.88)) # density [kg/m3]
 cp = Constant(mesh, PETSc.ScalarType(cp_f)) # [J/kg*K]
 k = Constant(mesh, PETSc.ScalarType(k_f)) # [W/m*K]
@@ -330,6 +335,7 @@ T_r = Constant(mesh, PETSc.ScalarType(T_f))
 # Interpolate initial temperature vertically for a smooth gradient
 # T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
 T_n.x.array[:] = PETSc.ScalarType(T_f)
+
 # theta_n.x.array[:] = PETSc.ScalarType(T_f)
 
 u_.x.array[:] = PETSc.ScalarType(1.0)
@@ -349,10 +355,6 @@ u_.x.array[:] = PETSc.ScalarType(1.0)
 # T_bottom_bc_scalar = np.array((T0_bottom_wall,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
 # bcT_bottom_wall = dirichletbc(T_bottom_bc_scalar, bottom_wall_dofs, S)
 
-# print("applying top wall temp = {}".format(T0_top_wall))
-# top_wall_dofs = locate_dofs_geometrical(S, top_wall)
-# T_top_bc_scalar = np.array((T0_top_wall,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
-# bcT_top_wall = dirichletbc(T_top_bc_scalar, top_wall_dofs, S)
 
 # apply BCs to non-dimensional temperature from Oeurtatani et al. 2008
 print("applying bottom wall temp = {}".format(T0_bottom_wall))
@@ -361,12 +363,6 @@ bcT_bottom_wall = dirichletbc(
     PETSc.ScalarType(T0_bottom_wall), bottom_wall_dofs, S
 )
 
-# print("applying right wall temp = {}".format(T0_bottom_wall))
-# right_wall_dofs = locate_dofs_geometrical(S, right_wall)
-# bcT_right_wall = dirichletbc(
-#     PETSc.ScalarType(T0_bottom_wall), right_wall_dofs, S
-# )
-
 print("applying top wall temp = {}".format(T0_top_wall))
 top_wall_dofs = locate_dofs_geometrical(S, top_wall)
 bcT_top_wall = dirichletbc(
@@ -374,6 +370,8 @@ bcT_top_wall = dirichletbc(
 )
 
 bcT = [bcT_top_wall, bcT_bottom_wall]
+
+set_bc(T_n.vector,bcT)
 
 # bcT = [bcT_bottom_wall, bcT_right_wall]
 
@@ -405,6 +403,7 @@ if pv_panel_flag:
 # bcp_right_wall = dirichletbc(PETSc.ScalarType(pressure_bc), right_wall_dofs, Q)
 
 bcp = []  # [bcp_left_wall, bcp_right_wall, bcp_bottom_wall, bcp_top_wall]
+# TODO - pin pressure
 
 # ================================================================
 # Build All Forms
@@ -467,13 +466,26 @@ L3 = form(inner(u_, v) * dx - (dt/rho) * inner(nabla_grad(p_), v) * dx) # u_ is 
 # )  # needs to be reassembled bc of u_
 # L4 = form((rho*cp / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
 
-# Residual, think this is just writing the "strong" governing equation?
-# # T_mid = 0.5*(T_n + theta) # Crank-Nicholsen for temperature??
-# r = (1 / dt)*(theta - T_n) + dot(u_, nabla_grad(theta)) - alpha*div(grad(theta))
-# # r = (1 / dt)*(theta - T_n) - alpha*div(grad(theta))
-# # r = dot(u_, nabla_grad(theta)) - alpha*div(grad(theta))
-# # r = -alpha*div(grad(theta))
-# # r = 1.0
+
+
+# if stabilizing:
+#     # Pe = Constant(mesh, PETSc.ScalarType(1e10))
+#     h = CellDiameter(mesh)
+#     unorm = sqrt(inner(u_,u_)) # ??
+#     Pe = (unorm*h)/(2.0*alpha)
+#     print('Peclet number = ', Pe)
+#     # nb = sqrt(inner(u_,u_))
+#     tau = 0.5*h*pow(4.0/(Pe*h)+2.0*unorm,-1.0)
+#     s=s+tau*inner(u_,grad(s))
+
+if stabilizing:
+    # Residual, think this is just writing the "strong" governing equation?
+    # T_mid = 0.5*(T_n + theta) # Crank-Nicholsen for temperature??
+    r = (1 / dt)*(theta - T_n) + dot(u_, nabla_grad(theta)) - alpha*div(grad(theta))
+    # r = (1 / dt)*(theta - T_n) - alpha*div(grad(theta))
+    # r = dot(u_, nabla_grad(theta)) - alpha*div(grad(theta))
+    # r = -alpha*div(grad(theta))
+    # r = 1.0
 
 # how to print these terms?
 F4 = (1 / dt) * inner(theta - T_n, s) * dx # theta = unknown, T_n = temp from previous timestep
@@ -538,13 +550,17 @@ pc2.setHYPREType("boomeramg")
 # solver3.setType(PETSc.KSP.Type.GMRES)
 # pc3 = solver3.getPC()
 # pc3.setType(PETSc.PC.Type.JACOBI)  # TODO - test solution with SOR
+solver3 = PETSc.KSP().create(mesh.comm)
+solver3.setType(PETSc.KSP.Type.PREONLY)
+pc3 = solver3.getPC()
+pc3.setType(PETSc.PC.Type.LU)
 
 # copied from Nav Stokes tutorial: https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code2.html
-solver3 = PETSc.KSP().create(mesh.comm)
-# solver3.setOperators(A3)
-solver3.setType(PETSc.KSP.Type.CG)
-pc3 = solver3.getPC()
-pc3.setType(PETSc.PC.Type.SOR)
+# solver3 = PETSc.KSP().create(mesh.comm)
+# # solver3.setOperators(A3)
+# solver3.setType(PETSc.KSP.Type.CG)
+# pc3 = solver3.getPC()
+# pc3.setType(PETSc.PC.Type.SOR)
 
 # Solver for step 4
 # # solver4 = PETSc.KSP().create(mesh.comm)
