@@ -1,5 +1,10 @@
 """
 Rayleigh-Benard Convection Flow
+- copied from rayleigh-benard-chorin-dolfinx-dimensional.py by Ethan Young on 8/29 and fixed a few bugs:
+    - switched negative to positive sign on viscosity term in momentum equation
+    - added pressure term into momentum equation
+    - pinned pressure by adding pressure BC
+    - switched solvers back to GMRES and JACOBI
 - copied from Walid Arsalene's FEniCS code, adapted to FEniCSx by Brooke Stanislawski
 - uses the governing equations from Chorin 1968 (Oberbeck-Boussinesq approximation of the Navier-Stokes equations)
 - includes the option to model the classical convective flow in an empty domain or to include a heated pv panel at the center of the domain
@@ -72,8 +77,9 @@ ny = 40 # 50 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min
 # values from Example 9.1 in Incropera
 # T0_top_wall = 25+273.15 # 300.0 # 300.000 # 0
 # T0_bottom_wall = 70.+273.15 # 300.00109 # 0 #1
-T0_top_wall = 19+273.15 # 320.50 # 300.000 # 0
-T0_bottom_wall = 39.3+273.15 # 320.5007685957619775737  #300.00109 # 0 #1
+def_hot_wall = 100.0
+T0_top_wall = -def_hot_wall #19+273.15 # 320.50 # 300.000 # 0
+T0_bottom_wall = def_hot_wall # 39.3+273.15 # 320.5007685957619775737  #300.00109 # 0 #1
 
 # T0_top_wall = 39+273.15 # 320.50 # 300.000 # 0
 # T0_bottom_wall = 19+273.15 # 320.5007685957619775737  #300.00109 # 0 #1
@@ -88,68 +94,70 @@ T_f = T_avg # (deltaT/2.)+T0_top_wall
 stabilizing = False
 pv_panel_flag = False  # empty domain or with a pv panel in the center?
 
-save_fn = 'empty_Gastueil2007_allnewsolvers_gravon_SUPGoff'
-t_final = 1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
-dt_num = 0.005 # 0.01 #0.001
+save_fn = 'canonicalRB_ethan'
+t_final = 5.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+dt_num = 0.01 # 0.01 #0.001
 # ================================================================
 # Build Mesh
 # ================================================================
 
 if pv_panel_flag:
-    comm = MPI.COMM_WORLD
+    pass
 
-    gmsh.initialize()
-    gmsh.option.setNumber("General.Terminal", 0)
+    # comm = MPI.COMM_WORLD
 
-    gmsh_model = gmsh.model()
-    gmsh_model.add("domain")
-    gmsh_model.setCurrent("domain")
+    # gmsh.initialize()
+    # gmsh.option.setNumber("General.Terminal", 0)
 
-    ndim = 2
+    # gmsh_model = gmsh.model()
+    # gmsh_model.add("domain")
+    # gmsh_model.setCurrent("domain")
 
-    domain_width = x_max - x_min #3.0  # box width
-    domain_height = y_max - y_min # 1.0  #  # box height
+    # ndim = 2
 
-    domain_id = gmsh_model.occ.addRectangle(
-        0, 0, 0, domain_width, domain_height
-    )  # Notice this spans from [0, x_max], [0, y_max], your BCs may need adjustment
-    domain_tag = (ndim, domain_id)
+    # domain_width = x_max - x_min #3.0  # box width
+    # domain_height = y_max - y_min # 1.0  #  # box height
 
-    panel_width = 0.5  # Chord length, or width
-    panel_height = 0.05  # Sets the panel thickness, really
-    panel_angle = np.radians(
-        30
-    )  # Sets the panel rotation (argument must be radians for gmsh)
+    # domain_id = gmsh_model.occ.addRectangle(
+    #     0, 0, 0, domain_width, domain_height
+    # )  # Notice this spans from [0, x_max], [0, y_max], your BCs may need adjustment
+    # domain_tag = (ndim, domain_id)
 
-    panel_id = gmsh_model.occ.addRectangle(
-        -0.5 * panel_width, -0.5 * panel_height, 0, panel_width, panel_height
-    )
-    panel_tag = (ndim, panel_id)
+    # panel_width = 0.5  # Chord length, or width
+    # panel_height = 0.05  # Sets the panel thickness, really
+    # panel_angle = np.radians(
+    #     30
+    # )  # Sets the panel rotation (argument must be radians for gmsh)
 
-    # Rotate the panel and shift it into its correct position
-    gmsh_model.occ.rotate([panel_tag], 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, panel_angle)
-    gmsh_model.occ.translate([panel_tag], 0.5 * domain_width, 0.5 * domain_height, 0.0)
+    # panel_id = gmsh_model.occ.addRectangle(
+    #     -0.5 * panel_width, -0.5 * panel_height, 0, panel_width, panel_height
+    # )
+    # panel_tag = (ndim, panel_id)
 
-    # Cookie cutter step, domain = domain - panel, is how to read this
-    gmsh_model.occ.cut([domain_tag], [panel_tag])
+    # # Rotate the panel and shift it into its correct position
+    # gmsh_model.occ.rotate([panel_tag], 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, panel_angle)
+    # gmsh_model.occ.translate([panel_tag], 0.5 * domain_width, 0.5 * domain_height, 0.0)
 
-    gmsh_model.occ.synchronize()
+    # # Cookie cutter step, domain = domain - panel, is how to read this
+    # gmsh_model.occ.cut([domain_tag], [panel_tag])
 
-    all_pts = gmsh_model.occ.getEntities(0)
+    # gmsh_model.occ.synchronize()
 
-    l_characteristic = 0.05  # Sets the characteristic size of the cells
-    gmsh_model.mesh.setSize(all_pts, l_characteristic)
+    # all_pts = gmsh_model.occ.getEntities(0)
 
-    vol_tag_list = gmsh_model.occ.getEntities(ndim)
+    # l_characteristic = 0.05  # Sets the characteristic size of the cells
+    # gmsh_model.mesh.setSize(all_pts, l_characteristic)
 
-    for vol_tag in vol_tag_list:
-        vol_id = vol_tag[1]
-        gmsh_model.add_physical_group(ndim, [vol_id], vol_id)
+    # vol_tag_list = gmsh_model.occ.getEntities(ndim)
 
-    # Generate the mesh
-    gmsh_model.mesh.generate(ndim)
+    # for vol_tag in vol_tag_list:
+    #     vol_id = vol_tag[1]
+    #     gmsh_model.add_physical_group(ndim, [vol_id], vol_id)
 
-    mesh, mt, ft = io.gmshio.model_to_mesh(gmsh_model, comm, 0, gdim=2)
+    # # Generate the mesh
+    # gmsh_model.mesh.generate(ndim)
+
+    # mesh, mt, ft = io.gmshio.model_to_mesh(gmsh_model, comm, 0, gdim=2)
 
 else:
     # create an empty domain mesh
@@ -178,8 +186,7 @@ else:
 # Pr = Constant(mesh, PETSc.ScalarType(0.7))
 
 # g = Constant(mesh, PETSc.ScalarType((0, 1)))
-g = Constant(mesh, PETSc.ScalarType((0, -9.81))) # negative?
-# g = Constant(mesh, PETSc.ScalarType((0, -100.))) # negative?
+g = Constant(mesh, PETSc.ScalarType((0, -9.81))) # negative? YES
 # g = Constant(mesh, PETSc.ScalarType((0, 981.)))
 # g = Constant(mesh, PETSc.ScalarType((0, 98000000.1)))
 # g = Constant(mesh, PETSc.ScalarType((0, 4900000.)))
@@ -208,20 +215,24 @@ k_f = 613*10**(-3) # W/m*K
 rho_f = 993.88 #998.57 # kg/m3
 cp_f = 4.179*1000 # J/kg*K
 alpha_f = k_f/(rho_f*cp_f) # m2/s
-print('alpha = ',alpha_f)
+print('alpha = ', alpha_f)
 
 # from Gasteuil et al 2007 and Incropera
 # beta = Constant(mesh, PETSc.ScalarType(2.95e-4)) # [1/K] thermal expansion coefficient (also alpha)
-beta = Constant(mesh, PETSc.ScalarType(2.76e-4)) # [1/K] thermal expansion coefficient
+# beta = Constant(mesh, PETSc.ScalarType(2.76e-4)) # [1/K] thermal expansion coefficient
+beta = Constant(mesh, PETSc.ScalarType(0.01)) # [1/K] thermal expansion coefficient
 # alpha = Constant(mesh, PETSc.ScalarType(1.48e-7)) # thermal diffusivity [m2/s]
 # alpha = Constant(mesh, PETSc.ScalarType(alpha_f)) # thermal diffusivity [m2/s]
 # alpha = Constant(mesh, PETSc.ScalarType(10.0)) # thermal diffusivity [m2/s]
-alpha = Constant(mesh, PETSc.ScalarType(0.001)) # thermal diffusivity [m2/s]
+# alpha = Constant(mesh, PETSc.ScalarType(0.1)) # thermal diffusivity [m2/s]
+alpha = Constant(mesh, PETSc.ScalarType(0.01)) # thermal diffusivity [m2/s]
 rho = Constant(mesh, PETSc.ScalarType(993.88)) # density [kg/m3]
-cp = Constant(mesh, PETSc.ScalarType(cp_f)) # [J/kg*K]
-k = Constant(mesh, PETSc.ScalarType(k_f)) # [W/m*K]
+# rho = Constant(mesh, PETSc.ScalarType(10.0)) # density [kg/m3]
+# cp = Constant(mesh, PETSc.ScalarType(cp_f)) # [J/kg*K]
+# k = Constant(mesh, PETSc.ScalarType(k_f)) # [W/m*K]
 # mu = Constant(mesh, PETSc.ScalarType(812.e-6)) # dynamic viscosity [Ns/m2]
-mu = Constant(mesh, PETSc.ScalarType(8.55e-4)) # dynamic viscosity [Ns/m2]
+# mu = Constant(mesh, PETSc.ScalarType(8.55e-4)) # dynamic viscosity [Ns/m2]
+mu = Constant(mesh, PETSc.ScalarType(0.01)) # dynamic viscosity [Ns/m2]
 # nu = Constant(mesh, PETSc.ScalarType(8.6026e-07)) # kinematic viscosity [m3/kg]
 
 dt = Constant(mesh, PETSc.ScalarType(dt_num))
@@ -257,7 +268,7 @@ s = TestFunction(S)
 T_n = Function(S)  # for outputting T, calculated from theta for each timestep
 T_n.name = "T_n"
 T_ = Function(S)
-T_r = Function(S)  # for outputting T, calculated from theta for each timestep
+# T_r = Function(S)  # for outputting T, calculated from theta for each timestep
 # theta_n = Function(S)
 # theta_n.name = "theta_n"
 # theta_ = Function(S)
@@ -279,12 +290,20 @@ def bottom_wall(x):
 def top_wall(x):
     return np.isclose(x[1], y_max)
 
+def bottom_left_corner(x):
+    return np.logical_and(np.isclose(x[1], y_min), np.isclose(x[0], x_min))
+
 def internal_boundaries(x):
     tol = 1e-3
     x_test = np.logical_and(x_min + tol < x[0], x[0] < x_max - tol)
     y_test = np.logical_and(y_min + tol < x[1], x[1] < y_max - tol)
     return np.logical_and(x_test, y_test)
 
+
+bottom_left_corner_pressure_dofs = locate_dofs_geometrical(Q, bottom_left_corner)
+bcp_bottom_left_corner = dirichletbc(0.0, bottom_left_corner_pressure_dofs, Q)
+bcp = [bcp_bottom_left_corner]
+# bcp = []
 
 # Velocity Boundary Conditions
 left_wall_dofs = locate_dofs_geometrical(V, left_wall)
@@ -403,7 +422,7 @@ if pv_panel_flag:
 # bcp_left_wall = dirichletbc(PETSc.ScalarType(pressure_bc), left_wall_dofs, Q)
 # bcp_right_wall = dirichletbc(PETSc.ScalarType(pressure_bc), right_wall_dofs, Q)
 
-bcp = []  # [bcp_left_wall, bcp_right_wall, bcp_bottom_wall, bcp_top_wall]
+# bcp = []  # [bcp_left_wall, bcp_right_wall, bcp_bottom_wall, bcp_top_wall]
 # TODO - pin pressure
 
 # ================================================================
@@ -429,22 +448,43 @@ bcp = []  # [bcp_left_wall, bcp_right_wall, bcp_bottom_wall, bcp_top_wall]
 # using rho and mu
 # F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(dot(u_n, nabla_grad(u_n)), v) * dx # convection
 # # F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(nabla_grad(u_n) * u_n, v) * dx # convection
-F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * (inner(nabla_grad(u_n) * u_n, v) * dx ) # convection
+# F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * (inner(nabla_grad(u_n) * u_n, v) * dx ) # convection
+
+# Crank-Nicolson velocity
+U_CN = 0.5 * (u + u_)
+
+# Adams-Bashforth velocity
+U_AB = 1.5 * u_ - 0.5 * u_n
+
+use_pressure_in_F1 = True
+
+F1 = (rho / dt) * inner(u - u_n, v) * dx
+F1 += rho * inner(dot(U_AB, nabla_grad(U_CN)), v) * dx # convection
 # # F1 += mu * inner(div(grad(u)), (v)) * dx
-F1 += mu * inner(nabla_grad(u), nabla_grad(v)) * dx # viscosity # + bc it was negative when subtracted from RHS but then when it comes over to the LHS as -mu * div(grad(u)) and we re-write it as mu * inner(grad(u), grad(test)) THAT'S where the sign change happens
-F1 -= rho * beta * inner((T_n-T_r) * g, v) * dx # buoyancy
+F1 += mu * inner(grad(U_CN), grad(v)) * dx # viscosity # + or - ??
+# F1 -= rho * beta * inner((T_n-T_r) * g, v) * dx # buoyancy
+F1 -= beta * inner((T_n-T_r) * g, v) * dx # buoyancy
+if use_pressure_in_F1:
+    F1 += inner(grad(p_), v) * dx
 
 a1 = form(lhs(F1))  # dependent on u
 L1 = form(rhs(F1))
 
 # step 2: pressure correction
 a2 = form(inner(nabla_grad(p), nabla_grad(q)) * dx)
-L2 = form(-(rho / dt) * div(u_) * q * dx)  # needs to be reassembled
+
+if use_pressure_in_F1:
+    L2 = form(dot(nabla_grad(p_), nabla_grad(q))*dx - (rho / dt) * div(u_) * q * dx)  # needs to be reassembled
+else:
+    L2 = form( - (rho / dt) * div(u_) * q * dx)  # needs to be reassembled
 # L2 = form(-(1 / dt) * div(u_) * q * dx)  # needs to be reassembled
 
 # step 3: velocity update
 a3 = form(inner(u, v) * dx)  # doesn't need to be reassembled
-L3 = form(inner(u_, v) * dx - (dt/rho) * inner(nabla_grad(p_), v) * dx) # u_ is known
+if use_pressure_in_F1:
+    L3 = form(inner(u_, v) * dx - (dt/rho) * inner(grad(p_ - p_n), v) * dx) # u_ is known
+else:
+    L3 = form(inner(u_, v) * dx - (dt/rho) * inner(grad(p_), v) * dx) # u_ is known
 # L3 = form(inner(u_, v) * dx - dt * inner(nabla_grad(p_), v) * dx) # u_ is known
 
 
@@ -527,7 +567,7 @@ L4 = form(rhs(F4))
 # copied from Nav Stokes tutorial: https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code2.html
 solver1 = PETSc.KSP().create(mesh.comm)
 # solver1.setOperators(A1)
-solver1.setType(PETSc.KSP.Type.BCGS)
+solver1.setType(PETSc.KSP.Type.GMRES)
 pc1 = solver1.getPC()
 pc1.setType(PETSc.PC.Type.JACOBI)
 
@@ -541,7 +581,7 @@ pc1.setType(PETSc.PC.Type.JACOBI)
 # copied from Nav Stokes tutorial: https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code2.html
 solver2 = PETSc.KSP().create(mesh.comm)
 # solver2.setOperators(A2)
-solver2.setType(PETSc.KSP.Type.MINRES)
+solver2.setType(PETSc.KSP.Type.GMRES)
 pc2 = solver2.getPC()
 pc2.setType(PETSc.PC.Type.HYPRE)
 pc2.setHYPREType("boomeramg")
@@ -552,9 +592,9 @@ pc2.setHYPREType("boomeramg")
 # pc3 = solver3.getPC()
 # pc3.setType(PETSc.PC.Type.JACOBI)  # TODO - test solution with SOR
 solver3 = PETSc.KSP().create(mesh.comm)
-solver3.setType(PETSc.KSP.Type.PREONLY)
+solver3.setType(PETSc.KSP.Type.GMRES)
 pc3 = solver3.getPC()
-pc3.setType(PETSc.PC.Type.LU)
+pc3.setType(PETSc.PC.Type.JACOBI)
 
 # copied from Nav Stokes tutorial: https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code2.html
 # solver3 = PETSc.KSP().create(mesh.comm)
@@ -597,7 +637,7 @@ pc4.setType(PETSc.PC.Type.LU)
 eps = 3.0e-16
 t = dt_num  # dt # 0.0
 ct = 1  # 0
-save_interval = 1  # 50
+save_interval = 10  # 50
 
 with io.XDMFFile(mesh.comm, save_fn+".xdmf", "w") as xdmf:
     xdmf.write_mesh(mesh)
@@ -674,7 +714,7 @@ while t < t_final + eps:
     with b3.localForm() as loc_3:
         loc_3.set(0)
     b3 = assemble_vector(b3, L3)
-    apply_lifting(b3, [a3], [bcu])
+    # apply_lifting(b3, [a3], [bcu])
     b3.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
     solver3.solve(b3, u_.vector)
     u_.x.scatter_forward()
@@ -704,17 +744,18 @@ while t < t_final + eps:
     T_n_max = mesh.comm.allreduce(np.amax(T_n.vector.array), op=MPI.MAX)
     T_n_sum = mesh.comm.allreduce(np.sum(T_n.vector.array), op=MPI.SUM)
 
-    with io.XDMFFile(mesh.comm, save_fn+".xdmf", "a") as xdmf:
-        xdmf.write_function(u_n, t)
-        xdmf.write_function(p_n, t)
-        xdmf.write_function(T_n, t)
-        # xdmf.write_function(theta_n, t)
-
     if ct % save_interval == 0:
-        print(
-            "Time = %.6f, u_max = %.6e, p_max = %.6e, T_max = %.6e, T_sum = %.6e"
-            % (t, u_n_max, p_n_max, T_n_max, T_n_sum)
-        )
+        with io.XDMFFile(mesh.comm, save_fn+".xdmf", "a") as xdmf:
+            xdmf.write_function(u_n, t)
+            xdmf.write_function(p_n, t)
+            xdmf.write_function(T_n, t)
+            # xdmf.write_function(theta_n, t)
+
+        if mesh.comm.Get_rank() == 0:
+            print(
+                "Time = %.6f, u_max = %.6e, p_max = %.6e, T_max = %.6e, T_sum = %.6e"
+                % (t, u_n_max, p_n_max, T_n_max, T_n_sum)
+            )
 
     # Move to next step
     t += float(dt)
