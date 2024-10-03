@@ -91,11 +91,11 @@ T_avg = (T0_top_wall+T0_bottom_wall)/2.
 T_f = T_avg # (deltaT/2.)+T0_top_wall
 # ^ these are equivalent
 
-stabilizing = False
+stabilizing = True
 pv_panel_flag = False  # empty domain or with a pv panel in the center?
 
 save_fn = 'canonicalRB_ethan'
-t_final = 50.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+t_final = 5.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
 dt_num = 0.01 # 0.01 #0.001
 # ================================================================
 # Build Mesh
@@ -224,7 +224,7 @@ beta = Constant(mesh, PETSc.ScalarType(0.01)) # [1/K] thermal expansion coeffici
 # alpha = Constant(mesh, PETSc.ScalarType(1.48e-7)) # thermal diffusivity [m2/s]
 # alpha = Constant(mesh, PETSc.ScalarType(alpha_f)) # thermal diffusivity [m2/s]
 # alpha = Constant(mesh, PETSc.ScalarType(10.0)) # thermal diffusivity [m2/s]
-alpha = Constant(mesh, PETSc.ScalarType(0.001)) # thermal diffusivity [m2/s] # this is 1e-4
+alpha = Constant(mesh, PETSc.ScalarType(0.01)) # thermal diffusivity [m2/s] # this is 1e-4
 # alpha = Constant(mesh, PETSc.ScalarType(1e-7)) # thermal diffusivity [m2/s]
 rho = Constant(mesh, PETSc.ScalarType(993.88)) # density [kg/m3]
 # rho = Constant(mesh, PETSc.ScalarType(10.0)) # density [kg/m3]
