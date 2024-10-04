@@ -92,10 +92,10 @@ T_f = T_avg # (deltaT/2.)+T0_top_wall
 # ^ these are equivalent
 
 stabilizing = False
-pv_panel_flag = False # True  # empty domain or with a pv panel in the center?
+pv_panel_flag = False  # empty domain or with a pv panel in the center?
 
 save_fn = 'temp_panel'
-t_final = 10.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+t_final = 15.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
 dt_num = 0.01 # 0.01 #0.001
 # ================================================================
 # Build Mesh
@@ -186,8 +186,9 @@ else:
 # Pr = Constant(mesh, PETSc.ScalarType(0.7))
 
 # g = Constant(mesh, PETSc.ScalarType((0, 1)))
-g = Constant(mesh, PETSc.ScalarType((0, -9.81))) # negative? YES
-# g = Constant(mesh, PETSc.ScalarType((0, 981.)))
+# g = Constant(mesh, PETSc.ScalarType((0, -9.81))) # negative? YES
+g = Constant(mesh, PETSc.ScalarType((0, -98.1)))
+# g = Constant(mesh, PETSc.ScalarType((0, -981.)))
 # g = Constant(mesh, PETSc.ScalarType((0, 98000000.1)))
 # g = Constant(mesh, PETSc.ScalarType((0, 4900000.)))
 # g = Constant(mesh, PETSc.ScalarType((0, 0)))
@@ -223,9 +224,7 @@ print('alpha = ', alpha_f)
 beta = Constant(mesh, PETSc.ScalarType(0.01)) # [1/K] thermal expansion coefficient
 # alpha = Constant(mesh, PETSc.ScalarType(1.48e-7)) # thermal diffusivity [m2/s]
 # alpha = Constant(mesh, PETSc.ScalarType(alpha_f)) # thermal diffusivity [m2/s]
-# alpha = Constant(mesh, PETSc.ScalarType(10.0)) # thermal diffusivity [m2/s]
 alpha = Constant(mesh, PETSc.ScalarType(0.01)) # thermal diffusivity [m2/s] # this is 1e-4
-# alpha = Constant(mesh, PETSc.ScalarType(1e-7)) # thermal diffusivity [m2/s]
 # rho = Constant(mesh, PETSc.ScalarType(993.88)) # density [kg/m3]
 rho = Constant(mesh, PETSc.ScalarType(1.0)) # density [kg/m3]
 # rho = Constant(mesh, PETSc.ScalarType(10.0)) # density [kg/m3]
@@ -312,7 +311,7 @@ left_wall_dofs = locate_dofs_geometrical(V, left_wall)
 u_noslip = np.array((0,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
 # print(u_noslip)
 # exit()
-u_lid = np.array((1,0), dtype=PETSc.ScalarType) # ux, uy = 1, 0
+# u_lid = np.array((1,0), dtype=PETSc.ScalarType) # ux, uy = 1, 0
 # u_noslip = np.array((10,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
 bcu_left_wall = dirichletbc(u_noslip, left_wall_dofs, V)
 
@@ -323,8 +322,8 @@ bottom_wall_dofs = locate_dofs_geometrical(V, bottom_wall)
 bcu_bottom_wall = dirichletbc(u_noslip, bottom_wall_dofs, V)
 
 top_wall_dofs = locate_dofs_geometrical(V, top_wall)
-# bcu_top_wall = dirichletbc(u_noslip, top_wall_dofs, V)
-bcu_top_wall = dirichletbc(u_lid, top_wall_dofs, V)
+bcu_top_wall = dirichletbc(u_noslip, top_wall_dofs, V)
+# bcu_top_wall = dirichletbc(u_lid, top_wall_dofs, V)
 
 bcu = [bcu_left_wall, bcu_right_wall, bcu_bottom_wall, bcu_top_wall]
 
@@ -336,6 +335,8 @@ if pv_panel_flag:
     bcu_internal_walls = dirichletbc(u_noslip, boundary_dofs, V)
 
     bcu.append(bcu_internal_walls)
+
+set_bc(u_n.vector,bcu)
 
 # Temperature Boundary Conditions
 
@@ -359,8 +360,8 @@ T_r = Constant(mesh, PETSc.ScalarType(T_f))
 # theta0_top_wall = (T0_top_wall - T_r) / DeltaT # from Oeurtatani et al. 2008
 
 # Interpolate initial temperature vertically for a smooth gradient
-T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
-# T_n.x.array[:] = PETSc.ScalarType(T_f)
+# T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
+T_n.x.array[:] = PETSc.ScalarType(T_f)
 
 # theta_n.x.array[:] = PETSc.ScalarType(T_f)
 
@@ -468,7 +469,7 @@ F1 = (rho / dt) * inner(u - u_n, v) * dx
 F1 += rho * inner(dot(U_AB, nabla_grad(U_CN)), v) * dx # convection
 # # F1 += mu * inner(div(grad(u)), (v)) * dx
 F1 += mu * inner(grad(U_CN), grad(v)) * dx # viscosity # + or - ??
-# F1 -= beta * inner((T_n-T_r) * g, v) * dx # buoyancy
+F1 -= beta * inner((T_n-T_r) * g, v) * dx # buoyancy
 if use_pressure_in_F1:
     F1 += inner(grad(p_), v) * dx
 
