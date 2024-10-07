@@ -95,7 +95,7 @@ stabilizing = False
 pv_panel_flag = False  # empty domain or with a pv panel in the center?
 
 save_fn = 'temp_panel'
-t_final = 15.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+t_final = 12.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
 dt_num = 0.01 # 0.01 #0.001
 # ================================================================
 # Build Mesh
@@ -187,10 +187,8 @@ else:
 
 # g = Constant(mesh, PETSc.ScalarType((0, 1)))
 # g = Constant(mesh, PETSc.ScalarType((0, -9.81))) # negative? YES
-g = Constant(mesh, PETSc.ScalarType((0, -98.1)))
-# g = Constant(mesh, PETSc.ScalarType((0, -981.)))
-# g = Constant(mesh, PETSc.ScalarType((0, 98000000.1)))
-# g = Constant(mesh, PETSc.ScalarType((0, 4900000.)))
+# g = Constant(mesh, PETSc.ScalarType((0, -98.1)))
+g = Constant(mesh, PETSc.ScalarType((0, -9800000.1)))
 # g = Constant(mesh, PETSc.ScalarType((0, 0)))
 
 # nu = Constant(mesh, PETSc.ScalarType(1))
@@ -212,29 +210,36 @@ g = Constant(mesh, PETSc.ScalarType((0, -98.1)))
 # mu = Constant(mesh, PETSc.ScalarType(196.4e-7)) # dynamic viscosity [Ns/m2]
 
 # calc alpha from Incropera for water at 300 K
+nu_f = 1.003*10**(-3)
 k_f = 613*10**(-3) # W/m*K
 rho_f = 993.88 #998.57 # kg/m3
 cp_f = 4.179*1000 # J/kg*K
 alpha_f = k_f/(rho_f*cp_f) # m2/s
+mu_f = nu_f * rho_f
 print('alpha = ', alpha_f)
+print('mu = ', mu_f)
 
 # from Gasteuil et al 2007 and Incropera
 # beta = Constant(mesh, PETSc.ScalarType(2.95e-4)) # [1/K] thermal expansion coefficient (also alpha)
-# beta = Constant(mesh, PETSc.ScalarType(2.76e-4)) # [1/K] thermal expansion coefficient
-beta = Constant(mesh, PETSc.ScalarType(0.01)) # [1/K] thermal expansion coefficient
+beta = Constant(mesh, PETSc.ScalarType(2.76e-4)) # [1/K] thermal expansion coefficient
+# beta = Constant(mesh, PETSc.ScalarType(0.01)) # [1/K] thermal expansion coefficient
 # alpha = Constant(mesh, PETSc.ScalarType(1.48e-7)) # thermal diffusivity [m2/s]
-# alpha = Constant(mesh, PETSc.ScalarType(alpha_f)) # thermal diffusivity [m2/s]
-alpha = Constant(mesh, PETSc.ScalarType(0.01)) # thermal diffusivity [m2/s] # this is 1e-4
-# rho = Constant(mesh, PETSc.ScalarType(993.88)) # density [kg/m3]
-rho = Constant(mesh, PETSc.ScalarType(1.0)) # density [kg/m3]
+alpha = Constant(mesh, PETSc.ScalarType(alpha_f)) # thermal diffusivity [m2/s]
+# alpha = Constant(mesh, PETSc.ScalarType(0.01)) # thermal diffusivity [m2/s] # this is 1e-4
+rho = Constant(mesh, PETSc.ScalarType(993.88)) # density [kg/m3]
+# rho = Constant(mesh, PETSc.ScalarType(1.0)) # density [kg/m3]
 # rho = Constant(mesh, PETSc.ScalarType(10.0)) # density [kg/m3]
 # cp = Constant(mesh, PETSc.ScalarType(cp_f)) # [J/kg*K]
 # k = Constant(mesh, PETSc.ScalarType(k_f)) # [W/m*K]
 # mu = Constant(mesh, PETSc.ScalarType(812.e-6)) # dynamic viscosity [Ns/m2]
 # mu = Constant(mesh, PETSc.ScalarType(8.55e-4)) # dynamic viscosity [Ns/m2]
-mu = Constant(mesh, PETSc.ScalarType(0.01)) # dynamic viscosity [Ns/m2] # Re = 100
+# mu = Constant(mesh, PETSc.ScalarType(0.01)) # dynamic viscosity [Ns/m2] # Re = 100
+mu = Constant(mesh, PETSc.ScalarType(mu_f)) # dynamic viscosity [Ns/m2] # Re = 100
 # mu = Constant(mesh, PETSc.ScalarType(0.0025)) # dynamic viscosity [Ns/m2] # Re = 400
 # nu = Constant(mesh, PETSc.ScalarType(8.6026e-07)) # kinematic viscosity [m3/kg]
+
+# alpha = 1.47e-4 m2/s
+
 
 dt = Constant(mesh, PETSc.ScalarType(dt_num))
 
