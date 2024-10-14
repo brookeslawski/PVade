@@ -65,23 +65,28 @@ from ufl import (
 # ================================================================
 
 x_min = 0.0
-x_max = 0.4 #1.0
+x_max = 0.8 # 0.4 #1.0
 
 y_min = 0.0
 y_max = 0.4 #1.0 #3.0
 
 # h = 0.05
-nx = 40 # 50 # 100 # 100 # 50  # 150 # int((x_max - x_min)/h)
+nx = 80 # 50 # 100 # 100 # 50  # 150 # int((x_max - x_min)/h)
 ny = 40 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min)/h)
 
 # values from Example 9.1 in Incropera
 # T0_top_wall = 25+273.15 # 300.0 # 300.000 # 0
 # T0_bottom_wall = 70.+273.15 # 300.00109 # 0 #1
 
-T_film = 300.0 # K
-T_delta = 20.0 # delta from T_film
-T0_top_wall = T_film - T_delta
-T0_bottom_wall = T_film + T_delta
+# T_film = 300.0 # K
+# T_delta = 0.0 # delta from T_film
+# T0_top_wall = T_film - T_delta
+# T0_bottom_wall = T_film + T_delta
+
+# heated channel
+T_ambient = 300.0
+T0_top_wall = 350.0
+T0_bottom_wall = 350.0
 
 # Gasteuil et al 2007
 # def_hot_wall = 100.0 # 10.1 # 100.0
@@ -97,15 +102,17 @@ T0_bottom_wall = T_film + T_delta
 T0_pv_panel = 0 # only used if pv_panel_flag == True
 
 # deltaT = T0_bottom_wall - T0_top_wall
-T_avg = (T0_top_wall+T0_bottom_wall)/2.
-T_f = T_avg # (deltaT/2.)+T0_top_wall
+# T_avg = (T0_top_wall+T0_bottom_wall)/2.
+# T_f = T_avg # (deltaT/2.)+T0_top_wall
 # ^ these are equivalent
+
+T_f = T_ambient
 
 stabilizing = False
 pv_panel_flag = False  # empty domain or with a pv panel in the center?
 
 save_fn = 'temp_panel'
-t_final = 120.0 # 20.0 # 120.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+t_final = 1.0 # 10.0 # 20.0 # 120.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
 dt_num = 0.01 # 0.01 #0.001
 # ================================================================
 # Build Mesh
@@ -198,15 +205,15 @@ else:
 # cp_f = 4.179*1000 # J/kg*K
 
 # calc alpha from Incropera for air at 300 K
-g_f = -9.81
-beta_f = 1/300.0 # [1/K]
-nu_f = 0.01 # 15.89e-6 # 0.01 # [m2/s]
-# k_f = 0.0263 # W/m*K
-alpha_f = 22.5/10**6 # m2/s
-rho_f = 1.1314 # kg/m3
-# cp_f = 1.004*1000 # J/kg*K
+# g_f = -9.81
+# beta_f = 1/300.0 # [1/K]
+# nu_f = 15.89e-6 # 0.01 # 15.89e-6 # 0.01 # [m2/s]
+# # k_f = 0.0263 # W/m*K
+# alpha_f = 22.5/10**6 # m2/s
+# rho_f = 1.1314 # kg/m3
+# # cp_f = 1.004*1000 # J/kg*K
 
-# alpha_f = k_f/(rho_f*cp_f) # m2/s
+# # alpha_f = k_f/(rho_f*cp_f) # m2/s
 
 # from Gasteuil et al 2007
 # g_f = -98.1
@@ -216,13 +223,20 @@ rho_f = 1.1314 # kg/m3
 # alpha_f = 1.48e-7
 # rho_f = 993.88 #998.57 # kg/m3
 
-mu_f = nu_f * rho_f
+# from https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code1.html
+g_f = 0.0 #-9.81
+beta_f = 0.0
+alpha_f = 0.01 #22.5/10**6 # m2/s
+rho_f = 1 # kg/m3
+mu_f = 1.0
 
-Ra = (g_f*beta_f/(nu_f*alpha_f))*(T0_bottom_wall-T0_top_wall)*(y_max-y_min)
+# mu_f = nu_f * rho_f
+
+# Ra = (g_f*beta_f/(nu_f*alpha_f))*(T0_bottom_wall-T0_top_wall)*(y_max-y_min)
 
 print('alpha = ', alpha_f)
 print('mu = ', mu_f)
-print('Ra = {:.2E}'.format(Ra))
+# print('Ra = {:.2E}'.format(Ra))
 
 # Ra = Constant(1e8)
 # Ra = Constant(mesh, PETSc.ScalarType(1e5))
@@ -343,22 +357,26 @@ def internal_boundaries(x):
     return np.logical_and(x_test, y_test)
 
 
-bottom_left_corner_pressure_dofs = locate_dofs_geometrical(Q, bottom_left_corner)
-bcp_bottom_left_corner = dirichletbc(0.0, bottom_left_corner_pressure_dofs, Q)
-bcp = [bcp_bottom_left_corner]
+# bottom_left_corner_pressure_dofs = locate_dofs_geometrical(Q, bottom_left_corner)
+# bcp_bottom_left_corner = dirichletbc(0.0, bottom_left_corner_pressure_dofs, Q)
+# bcp = [bcp_bottom_left_corner]
 # bcp = []
 
 # Velocity Boundary Conditions
-left_wall_dofs = locate_dofs_geometrical(V, left_wall)
+# left_wall_dofs = locate_dofs_geometrical(V, left_wall)
 u_noslip = np.array((0,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
+# u_inflow = np.array((1,0), dtype=PETSc.ScalarType) # ux, uy = 1, 0
+
 # print(u_noslip)
 # exit()
 # u_lid = np.array((1,0), dtype=PETSc.ScalarType) # ux, uy = 1, 0
 # u_noslip = np.array((10,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
-bcu_left_wall = dirichletbc(u_noslip, left_wall_dofs, V)
+# bcu_left_wall = dirichletbc(u_noslip, left_wall_dofs, V)
+# bcu_left_wall = dirichletbc(PETSc.ScalarType(2.0), left_wall_dofs, V)
 
-right_wall_dofs = locate_dofs_geometrical(V, right_wall)
-bcu_right_wall = dirichletbc(u_noslip, right_wall_dofs, V)
+# right_wall_dofs = locate_dofs_geometrical(V, right_wall)
+# bcu_right_wall = dirichletbc(u_noslip, right_wall_dofs, V)
+# bcu_right_wall = dirichletbc(u_inflow, right_wall_dofs, V)
 
 bottom_wall_dofs = locate_dofs_geometrical(V, bottom_wall)
 bcu_bottom_wall = dirichletbc(u_noslip, bottom_wall_dofs, V)
@@ -367,7 +385,8 @@ top_wall_dofs = locate_dofs_geometrical(V, top_wall)
 bcu_top_wall = dirichletbc(u_noslip, top_wall_dofs, V)
 # bcu_top_wall = dirichletbc(u_lid, top_wall_dofs, V)
 
-bcu = [bcu_left_wall, bcu_right_wall, bcu_bottom_wall, bcu_top_wall]
+# bcu = [bcu_left_wall, bcu_right_wall, bcu_bottom_wall, bcu_top_wall]
+bcu = [bcu_bottom_wall, bcu_top_wall]
 
 if pv_panel_flag:
     boundary_facets = locate_entities_boundary(
@@ -379,6 +398,16 @@ if pv_panel_flag:
     bcu.append(bcu_internal_walls)
 
 set_bc(u_n.vector,bcu)
+
+# Pressure Boundary Conditions
+left_wall_dofs = locate_dofs_geometrical(Q, left_wall)
+bc_inflow = dirichletbc(PETSc.ScalarType(8), left_wall_dofs, Q)
+
+right_wall_dofs = locate_dofs_geometrical(Q, right_wall)
+bc_outflow = dirichletbc(PETSc.ScalarType(0), right_wall_dofs, Q)
+bcp = [bc_inflow, bc_outflow]
+
+set_bc(p_n.vector,bcp)
 
 # Temperature Boundary Conditions
 
@@ -402,12 +431,12 @@ T_r = Constant(mesh, PETSc.ScalarType(T_f))
 # theta0_top_wall = (T0_top_wall - T_r) / DeltaT # from Oeurtatani et al. 2008
 
 # Interpolate initial temperature vertically for a smooth gradient
-T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
-# T_n.x.array[:] = PETSc.ScalarType(T_f)
+# T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
+T_n.x.array[:] = PETSc.ScalarType(T_f)
 
 # theta_n.x.array[:] = PETSc.ScalarType(T_f)
 
-u_.x.array[:] = PETSc.ScalarType(1.0)
+# u_.x.array[:] = PETSc.ScalarType(1.0)
 
 # Set initial velocity?
 # u_n.x.array[:] = PETSc.ScalarType(0.0)
@@ -685,7 +714,7 @@ pc4.setType(PETSc.PC.Type.LU)
 eps = 3.0e-16
 t = dt_num  # dt # 0.0
 ct = 1  # 0
-save_interval = 10  # 50
+save_interval = 1 # 10  # 50
 
 with io.XDMFFile(mesh.comm, save_fn+".xdmf", "w") as xdmf:
     xdmf.write_mesh(mesh)
@@ -811,7 +840,7 @@ while t < t_final + eps:
 
 print('alpha = ', alpha_f)
 print('mu = ', mu_f)
-print('Ra = {:.2E}'.format(Ra))
+# print('Ra = {:.2E}'.format(Ra))
 
 # visualizing variables
 # ================================================================
