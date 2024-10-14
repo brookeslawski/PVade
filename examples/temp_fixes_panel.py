@@ -83,10 +83,16 @@ ny = 40 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min)/h)
 # T0_top_wall = T_film - T_delta
 # T0_bottom_wall = T_film + T_delta
 
-# heated channel
+# # heated channel
+# T_ambient = 300.0
+# T0_top_wall = 350.0
+# T0_bottom_wall = 350.0
+
+# flow over a flat plate
 T_ambient = 300.0
-T0_top_wall = 350.0
+T0_top_wall = T_ambient
 T0_bottom_wall = 350.0
+
 
 # Gasteuil et al 2007
 # def_hot_wall = 100.0 # 10.1 # 100.0
@@ -224,8 +230,8 @@ else:
 # rho_f = 993.88 #998.57 # kg/m3
 
 # from https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code1.html
-g_f = 0.0 #-9.81
-beta_f = 0.0
+g_f = -9.81
+beta_f = 0.1
 alpha_f = 0.01 #22.5/10**6 # m2/s
 rho_f = 1 # kg/m3
 mu_f = 1.0
@@ -333,7 +339,15 @@ T_ = Function(S)
 # %% ================================================================
 # Build Boundary Conditions
 # ================================================================
+class InletVelocity():
+    # copied from https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code2.html
+    def __init__(self):
+        pass
 
+    def __call__(self, x):
+        values = np.zeros((mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType)
+        values[0] = 4.0
+        return values
 
 def left_wall(x):
     return np.isclose(x[0], x_min)
@@ -357,12 +371,20 @@ def internal_boundaries(x):
     return np.logical_and(x_test, y_test)
 
 
-# bottom_left_corner_pressure_dofs = locate_dofs_geometrical(Q, bottom_left_corner)
-# bcp_bottom_left_corner = dirichletbc(0.0, bottom_left_corner_pressure_dofs, Q)
-# bcp = [bcp_bottom_left_corner]
-# bcp = []
+# pin pressure with bc at corner
+bottom_left_corner_pressure_dofs = locate_dofs_geometrical(Q, bottom_left_corner)
+bcp_bottom_left_corner = dirichletbc(0.0, bottom_left_corner_pressure_dofs, Q)
+bcp = [bcp_bottom_left_corner]
+bcp = []
 
 # Velocity Boundary Conditions
+# Inlet
+left_wall_dofs = locate_dofs_geometrical(V, left_wall)
+u_inlet = Function(V)
+inlet_velocity = InletVelocity()
+u_inlet.interpolate(inlet_velocity)
+bcu_inflow = dirichletbc(u_inlet, left_wall_dofs)
+
 # left_wall_dofs = locate_dofs_geometrical(V, left_wall)
 u_noslip = np.array((0,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
 # u_inflow = np.array((1,0), dtype=PETSc.ScalarType) # ux, uy = 1, 0
@@ -383,10 +405,14 @@ bcu_bottom_wall = dirichletbc(u_noslip, bottom_wall_dofs, V)
 
 top_wall_dofs = locate_dofs_geometrical(V, top_wall)
 bcu_top_wall = dirichletbc(u_noslip, top_wall_dofs, V)
-# bcu_top_wall = dirichletbc(u_lid, top_wall_dofs, V)
+
+# zero_scalar = Constant(mesh, PETSc.ScalarType(0.0))
+# top_wall_dofs = locate_dofs_geometrical(V, top_wall)
+# bcu_top_wall = dirichletbc(zero_scalar, top_wall_dofs, V)
+# # bcu_top_wall = dirichletbc(u_lid, top_wall_dofs, V)
 
 # bcu = [bcu_left_wall, bcu_right_wall, bcu_bottom_wall, bcu_top_wall]
-bcu = [bcu_bottom_wall, bcu_top_wall]
+bcu = [bcu_inflow, bcu_bottom_wall, bcu_top_wall]
 
 if pv_panel_flag:
     boundary_facets = locate_entities_boundary(
@@ -400,14 +426,14 @@ if pv_panel_flag:
 set_bc(u_n.vector,bcu)
 
 # Pressure Boundary Conditions
-left_wall_dofs = locate_dofs_geometrical(Q, left_wall)
-bc_inflow = dirichletbc(PETSc.ScalarType(8), left_wall_dofs, Q)
+# left_wall_dofs = locate_dofs_geometrical(Q, left_wall)
+# bc_inflow = dirichletbc(PETSc.ScalarType(8), left_wall_dofs, Q)
 
-right_wall_dofs = locate_dofs_geometrical(Q, right_wall)
-bc_outflow = dirichletbc(PETSc.ScalarType(0), right_wall_dofs, Q)
-bcp = [bc_inflow, bc_outflow]
+# right_wall_dofs = locate_dofs_geometrical(Q, right_wall)
+# bc_outflow = dirichletbc(PETSc.ScalarType(0), right_wall_dofs, Q)
+# bcp = [bc_inflow, bc_outflow]
 
-set_bc(p_n.vector,bcp)
+# set_bc(p_n.vector,bcp)
 
 # Temperature Boundary Conditions
 
