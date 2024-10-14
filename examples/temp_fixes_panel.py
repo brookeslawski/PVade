@@ -71,17 +71,22 @@ y_min = 0.0
 y_max = 0.4 #1.0 #3.0
 
 # h = 0.05
-nx = 30 # 50 # 100 # 100 # 50  # 150 # int((x_max - x_min)/h)
-ny = 30 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min)/h)
+nx = 40 # 50 # 100 # 100 # 50  # 150 # int((x_max - x_min)/h)
+ny = 40 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min)/h)
 
 # values from Example 9.1 in Incropera
 # T0_top_wall = 25+273.15 # 300.0 # 300.000 # 0
 # T0_bottom_wall = 70.+273.15 # 300.00109 # 0 #1
 
+T_film = 300.0 # K
+T_delta = 20.0 # delta from T_film
+T0_top_wall = T_film - T_delta
+T0_bottom_wall = T_film + T_delta
+
 # Gasteuil et al 2007
-def_hot_wall = 50.0 # 10.1 # 100.0
-T0_top_wall = -def_hot_wall #19+273.15 # 320.50 # 300.000 # 0
-T0_bottom_wall = def_hot_wall # 39.3+273.15 # 320.5007685957619775737  #300.00109 # 0 #1
+# def_hot_wall = 100.0 # 10.1 # 100.0
+# T0_top_wall = -def_hot_wall #19+273.15 # 320.50 # 300.000 # 0
+# T0_bottom_wall = def_hot_wall # 39.3+273.15 # 320.5007685957619775737  #300.00109 # 0 #1
 # def_hot_wall = 100.0
 # T0_top_wall = -def_hot_wall #19+273.15 # 320.50 # 300.000 # 0
 # T0_bottom_wall = def_hot_wall # 39.3+273.15 # 320.5007685957619775737  #300.00109 # 0 #1
@@ -100,7 +105,7 @@ stabilizing = False
 pv_panel_flag = False  # empty domain or with a pv panel in the center?
 
 save_fn = 'temp_panel'
-t_final = 150.0 # 120.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+t_final = 120.0 # 20.0 # 120.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
 dt_num = 0.01 # 0.01 #0.001
 # ================================================================
 # Build Mesh
@@ -192,19 +197,32 @@ else:
 # rho_f = 993.88 #998.57 # kg/m3
 # cp_f = 4.179*1000 # J/kg*K
 
+# calc alpha from Incropera for air at 300 K
+g_f = -9.81
+beta_f = 1/300.0 # [1/K]
+nu_f = 0.01 # 15.89e-6 # 0.01 # [m2/s]
+# k_f = 0.0263 # W/m*K
+alpha_f = 22.5/10**6 # m2/s
+rho_f = 1.1314 # kg/m3
+# cp_f = 1.004*1000 # J/kg*K
+
 # alpha_f = k_f/(rho_f*cp_f) # m2/s
 
 # from Gasteuil et al 2007
-g_f = -98.1
-# beta_f = 2.95e-4
-beta_f = 0.3
-nu_f = 8.17e-7
-alpha_f = 1.48e-7
-rho_f = 993.88 #998.57 # kg/m3
+# g_f = -98.1
+# # beta_f = 2.95e-4
+# beta_f = 0.3
+# nu_f = 8.17e-7
+# alpha_f = 1.48e-7
+# rho_f = 993.88 #998.57 # kg/m3
 
 mu_f = nu_f * rho_f
 
 Ra = (g_f*beta_f/(nu_f*alpha_f))*(T0_bottom_wall-T0_top_wall)*(y_max-y_min)
+
+print('alpha = ', alpha_f)
+print('mu = ', mu_f)
+print('Ra = {:.2E}'.format(Ra))
 
 # Ra = Constant(1e8)
 # Ra = Constant(mesh, PETSc.ScalarType(1e5))
@@ -258,8 +276,6 @@ rho = Constant(mesh, PETSc.ScalarType(rho_f)) # density [kg/m3]
 mu = Constant(mesh, PETSc.ScalarType(mu_f)) # dynamic viscosity [Ns/m2] # Re = 100
 # mu = Constant(mesh, PETSc.ScalarType(0.0025)) # dynamic viscosity [Ns/m2] # Re = 400
 # nu = Constant(mesh, PETSc.ScalarType(8.6026e-07)) # kinematic viscosity [m3/kg]
-
-
 
 
 dt = Constant(mesh, PETSc.ScalarType(dt_num))
@@ -386,8 +402,8 @@ T_r = Constant(mesh, PETSc.ScalarType(T_f))
 # theta0_top_wall = (T0_top_wall - T_r) / DeltaT # from Oeurtatani et al. 2008
 
 # Interpolate initial temperature vertically for a smooth gradient
-# T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
-T_n.x.array[:] = PETSc.ScalarType(T_f)
+T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
+# T_n.x.array[:] = PETSc.ScalarType(T_f)
 
 # theta_n.x.array[:] = PETSc.ScalarType(T_f)
 
