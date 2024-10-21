@@ -91,7 +91,7 @@ ny = 40 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min)/h)
 # flow over a flat plate
 T_ambient = 300.0
 T0_top_wall = T_ambient
-T0_bottom_wall = T_ambient + 40.0
+T0_bottom_wall = T_ambient + 20.0
 
 # # uniform inflow
 # inflow = 'uniform'
@@ -126,7 +126,7 @@ T0_pv_panel = 0 # only used if pv_panel_flag == True
 T_f = T_ambient
 
 stabilizing = False
-pv_panel_flag = False  # empty domain or with a pv panel in the center?
+pv_panel_flag = True  # empty domain or with a pv panel in the center?
 
 save_fn = 'temp_panel'
 t_final = 2.0 # 10.0 # 20.0 # 120.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
