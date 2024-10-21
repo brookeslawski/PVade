@@ -92,7 +92,7 @@ ny = 40 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min)/h)
 T_ambient = 300.0
 T0_top_wall = T_ambient
 T0_bottom_wall = T_ambient + 20.0
-T0_pv_panel = T_ambient # only used if pv_panel_flag == True
+T0_pv_panel = T_ambient + 20.0 # only used if pv_panel_flag == True
 
 
 # # uniform inflow
@@ -563,7 +563,7 @@ bcT_left_wall = dirichletbc(PETSc.ScalarType(T_ambient), left_wall_dofs, S)
 # bcT = [bcT_top_wall, bcT_bottom_wall]
 bcT = [bcT_left_wall, bcT_bottom_wall]
 
-set_bc(T_n.vector,bcT)
+
 # exit()
 
 # bcT = [bcT_bottom_wall, bcT_right_wall]
@@ -584,6 +584,7 @@ if pv_panel_flag:
     # bcT = [bcT_top_wall, bcT_bottom_wall, bcT_internal_walls]
     bcT.append(bcT_internal_walls)
 
+set_bc(T_n.vector,bcT)
 # print('bcT = ',bcT)
 
 # bcT = [T_bc]
