@@ -92,6 +92,8 @@ ny = 40 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min)/h)
 T_ambient = 300.0
 T0_top_wall = T_ambient
 T0_bottom_wall = T_ambient + 20.0
+T0_pv_panel = T_ambient # only used if pv_panel_flag == True
+
 
 # # uniform inflow
 # inflow = 'uniform'
@@ -116,7 +118,6 @@ d0 = 0.0 # 0.65*z_hub
 # T0_top_wall = 39+273.15 # 320.50 # 300.000 # 0
 # T0_bottom_wall = 19+273.15 # 320.5007685957619775737  #300.00109 # 0 #1
 
-T0_pv_panel = 0 # only used if pv_panel_flag == True
 
 # deltaT = T0_bottom_wall - T0_top_wall
 # T_avg = (T0_top_wall+T0_bottom_wall)/2.
@@ -163,17 +164,17 @@ if pv_panel_flag:
         30
     )  # Sets the panel rotation (argument must be radians for gmsh)
 
-    # panel_id = gmsh_model.occ.addRectangle(
-    #     -0.5 * panel_width, -0.5 * panel_height, 0, panel_width, panel_height
-    # )
-    # panel_tag = (ndim, panel_id)
+    panel_id = gmsh_model.occ.addRectangle(
+        -0.5 * panel_width, -0.5 * panel_height, 0, panel_width, panel_height
+    )
+    panel_tag = (ndim, panel_id)
 
-    # # Rotate the panel and shift it into its correct position
-    # gmsh_model.occ.rotate([panel_tag], 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, panel_angle)
-    # gmsh_model.occ.translate([panel_tag], 0.5 * domain_width, 0.5 * domain_height, 0.0)
+    # Rotate the panel and shift it into its correct position
+    gmsh_model.occ.rotate([panel_tag], 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, panel_angle)
+    gmsh_model.occ.translate([panel_tag], 0.5 * domain_width, 0.3 * domain_height, 0.0)
 
-    # # Cookie cutter step, domain = domain - panel, is how to read this
-    # gmsh_model.occ.cut([domain_tag], [panel_tag])
+    # Cookie cutter step, domain = domain - panel, is how to read this
+    gmsh_model.occ.cut([domain_tag], [panel_tag])
 
     gmsh_model.occ.synchronize()
 
@@ -535,24 +536,8 @@ T_n.x.array[:] = PETSc.ScalarType(T_f)
 # u_n.x.array[:] = PETSc.ScalarType(0.0)
 # u_n.x[1].array[:] = PETSc.ScalarType(1.0)
 
-
 # non-dimensional temperature
 # theta_n.x.array[:] = (T_n.x.array[:] - T_r) / DeltaT # from Oeurtatani et al. 2008
-
-# apply BCs to non-dimensional temperature from Oeurtatani et al. 2008
-# copying how BCs are defined in velocity field
-# print("applying bottom wall temp = {}".format(T0_bottom_wall))
-# bottom_wall_dofs = locate_dofs_geometrical(S, bottom_wall)
-# T_bottom_bc_scalar = np.array((T0_bottom_wall,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
-# bcT_bottom_wall = dirichletbc(T_bottom_bc_scalar, bottom_wall_dofs, S)
-
-
-# apply BCs to non-dimensional temperature from Oeurtatani et al. 2008
-# print("applying bottom wall temp = {}".format(T0_bottom_wall))
-# bottom_wall_dofs = locate_dofs_geometrical(S, bottom_wall)
-# bcT_bottom_wall = dirichletbc(
-#     PETSc.ScalarType(T0_bottom_wall), bottom_wall_dofs, S
-# )
 
 # nonuniform temperature bc along bottom wall
 # heated_cells = locate_entities(mesh, mesh.geometry.dim, lambda x: x[0] < (0.75*x_max))
@@ -565,15 +550,6 @@ bottom_wall_temperature = LowerWallTemperature()
 # T_bottom.interpolate(bottom_wall_temperature, heated_cells)
 T_bottom.interpolate(bottom_wall_temperature, rampdown_cells)
 bcT_bottom_wall = dirichletbc(T_bottom, bottom_wall_dofs)
-
-
-# upper_cells = locate_entities(mesh, mesh.geometry.dim, lambda x: x[1] > d0 + z0)
-# u_inlet = Function(V)
-# u_inlet.interpolate(lambda x: np.zeros((mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType))
-# left_wall_dofs = locate_dofs_geometrical(V, left_wall)
-# inlet_velocity = InletVelocity()
-# u_inlet.interpolate(inlet_velocity, upper_cells)
-# bcu_inflow = dirichletbc(u_inlet, left_wall_dofs)
 
 # print("applying top wall temp = {}".format(T0_top_wall))
 # top_wall_dofs = locate_dofs_geometrical(S, top_wall)
