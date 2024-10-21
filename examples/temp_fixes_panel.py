@@ -36,7 +36,7 @@ from dolfinx.fem.petsc import (
 )
 
 # from dolfinx.io import VTXWriter
-from dolfinx.mesh import create_rectangle, CellType, locate_entities_boundary
+from dolfinx.mesh import create_rectangle, CellType, locate_entities_boundary, locate_entities
 
 # from dolfinx.plot import vtk_mesh
 from ufl import (
@@ -65,13 +65,13 @@ from ufl import (
 # ================================================================
 
 x_min = 0.0
-x_max = 0.8 # 0.4 #1.0
+x_max = 1.2 # 0.4 #1.0
 
 y_min = 0.0
 y_max = 0.4 #1.0 #3.0
 
 # h = 0.05
-nx = 80 # 50 # 100 # 100 # 50  # 150 # int((x_max - x_min)/h)
+nx = 120 # 50 # 100 # 100 # 50  # 150 # int((x_max - x_min)/h)
 ny = 40 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min)/h)
 
 # values from Example 9.1 in Incropera
@@ -91,7 +91,18 @@ ny = 40 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min)/h)
 # flow over a flat plate
 T_ambient = 300.0
 T0_top_wall = T_ambient
-T0_bottom_wall = 350.0
+T0_bottom_wall = T_ambient + 40.0
+
+# # uniform inflow
+# inflow = 'uniform'
+# u0 = 1.0
+
+# loglaw influw
+inflow = 'loglaw'
+u_hub = 1.0
+z_hub = 0.12
+z0 = 0.005
+d0 = 0.0 # 0.65*z_hub
 
 
 # Gasteuil et al 2007
@@ -118,7 +129,7 @@ stabilizing = False
 pv_panel_flag = False  # empty domain or with a pv panel in the center?
 
 save_fn = 'temp_panel'
-t_final = 1.0 # 10.0 # 20.0 # 120.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+t_final = 2.0 # 10.0 # 20.0 # 120.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
 dt_num = 0.01 # 0.01 #0.001
 # ================================================================
 # Build Mesh
@@ -230,11 +241,11 @@ else:
 # rho_f = 993.88 #998.57 # kg/m3
 
 # from https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code1.html
-g_f = -9.81
-beta_f = 0.1
+g_f = -98.1
+beta_f = 0.01
 alpha_f = 0.01 #22.5/10**6 # m2/s
-rho_f = 1 # kg/m3
-mu_f = 1.0
+rho_f = 1.0 # kg/m3
+mu_f = 0.01
 
 # mu_f = nu_f * rho_f
 
@@ -346,7 +357,43 @@ class InletVelocity():
 
     def __call__(self, x):
         values = np.zeros((mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType)
-        values[0] = 4.0
+        print('x.shape vel = ', x.shape)
+        if inflow == 'uniform':
+            values[0] = u0
+
+        elif inflow == 'loglaw':
+            # values[0] = ((u_hub) * np.log(((x[1]) - d0) / z0) / (np.log((z_hub - d0) / z0)))
+            values[0] = ((u_hub) * np.log(((x[1]) - d0) / z0) / (np.log((z_hub - d0) / z0)))
+
+            print(values[0]) # might need fixing close to the ground
+
+            # h_panel = 0.15
+            # u_star = 0.45
+            # kappa = 0.41
+            # z0 = 0.005
+            # d0 = 0.65*h_panel
+            # values[0] = (u_star/kappa)*(np.log((x[1]-d0)/z0))
+
+            # exit()
+        return values
+    
+class LowerWallTemperature():
+    # copied from https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code2.html
+    def __init__(self):
+        pass
+
+    def __call__(self, x):
+        values = np.zeros((1, x.shape[1]), dtype=PETSc.ScalarType)
+        print('x.shape temp = ', x.shape)
+        # print('x.shape[0] = ', x.shape[0])
+        # print('x.shape[1] = ', x.shape[1])
+        # exit()
+        # values[0] = T0_bottom_wall
+        x0 = 0.75 * x_max # start of ramp down
+        values[0] = (T0_bottom_wall + ((x[0]-x0) / x_max) * (T_ambient - T0_bottom_wall))
+        print(values[0]) # might need fixing close to the ground
+        # exit()
+
         return values
 
 def left_wall(x):
@@ -364,6 +411,9 @@ def top_wall(x):
 def bottom_left_corner(x):
     return np.logical_and(np.isclose(x[1], y_min), np.isclose(x[0], x_min))
 
+def upper_right_corner(x):
+    return np.logical_and(np.isclose(x[1], y_max), np.isclose(x[0], x_max))
+
 def internal_boundaries(x):
     tol = 1e-3
     x_test = np.logical_and(x_min + tol < x[0], x[0] < x_max - tol)
@@ -372,25 +422,28 @@ def internal_boundaries(x):
 
 
 # pin pressure with bc at corner
-bottom_left_corner_pressure_dofs = locate_dofs_geometrical(Q, bottom_left_corner)
-bcp_bottom_left_corner = dirichletbc(0.0, bottom_left_corner_pressure_dofs, Q)
-bcp = [bcp_bottom_left_corner]
-bcp = []
+# bottom_left_corner_pressure_dofs = locate_dofs_geometrical(Q, bottom_left_corner)
+# bcp_bottom_left_corner = dirichletbc(0.0, bottom_left_corner_pressure_dofs, Q)
+# bcp = [bcp_bottom_left_corner]
+# # bcp = []
 
 # Velocity Boundary Conditions
 # Inlet
-left_wall_dofs = locate_dofs_geometrical(V, left_wall)
+upper_cells = locate_entities(mesh, mesh.geometry.dim, lambda x: x[1] > d0 + z0)
 u_inlet = Function(V)
+u_inlet.interpolate(lambda x: np.zeros((mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType))
+left_wall_dofs = locate_dofs_geometrical(V, left_wall)
 inlet_velocity = InletVelocity()
-u_inlet.interpolate(inlet_velocity)
+u_inlet.interpolate(inlet_velocity, upper_cells)
 bcu_inflow = dirichletbc(u_inlet, left_wall_dofs)
+
+# print(np.shape(u_inlet.x.array[:]))
+# exit()
 
 # left_wall_dofs = locate_dofs_geometrical(V, left_wall)
 u_noslip = np.array((0,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
 # u_inflow = np.array((1,0), dtype=PETSc.ScalarType) # ux, uy = 1, 0
 
-# print(u_noslip)
-# exit()
 # u_lid = np.array((1,0), dtype=PETSc.ScalarType) # ux, uy = 1, 0
 # u_noslip = np.array((10,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
 # bcu_left_wall = dirichletbc(u_noslip, left_wall_dofs, V)
@@ -403,13 +456,16 @@ u_noslip = np.array((0,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
 bottom_wall_dofs = locate_dofs_geometrical(V, bottom_wall)
 bcu_bottom_wall = dirichletbc(u_noslip, bottom_wall_dofs, V)
 
-top_wall_dofs = locate_dofs_geometrical(V, top_wall)
-bcu_top_wall = dirichletbc(u_noslip, top_wall_dofs, V)
-
-# zero_scalar = Constant(mesh, PETSc.ScalarType(0.0))
 # top_wall_dofs = locate_dofs_geometrical(V, top_wall)
-# bcu_top_wall = dirichletbc(zero_scalar, top_wall_dofs, V)
-# # bcu_top_wall = dirichletbc(u_lid, top_wall_dofs, V)
+# bcu_top_wall = dirichletbc(u_noslip, top_wall_dofs, V)
+
+# slip at top wall
+top_wall_entities = locate_entities_boundary(mesh, mesh.geometry.dim-1, top_wall)
+top_wall_dofs = locate_dofs_topological(V.sub(1), mesh.geometry.dim-1, top_wall_entities)
+zero_scalar = Constant(mesh, PETSc.ScalarType(0.0))
+bcu_top_wall = dirichletbc(zero_scalar, top_wall_dofs, V.sub(1))
+
+# bcu_top_wall = dirichletbc(u_lid, top_wall_dofs, V)
 
 # bcu = [bcu_left_wall, bcu_right_wall, bcu_bottom_wall, bcu_top_wall]
 bcu = [bcu_inflow, bcu_bottom_wall, bcu_top_wall]
@@ -426,14 +482,25 @@ if pv_panel_flag:
 set_bc(u_n.vector,bcu)
 
 # Pressure Boundary Conditions
+right_wall_entities = locate_entities_boundary(mesh, mesh.geometry.dim-1, right_wall)
+right_wall_dofs = locate_dofs_topological(Q, mesh.geometry.dim-1, right_wall_entities)
+zero_scalar = Constant(mesh, PETSc.ScalarType(0.0))
+bcp_outlet = dirichletbc(zero_scalar, right_wall_dofs, Q)
+bcp = [bcp_outlet]
+
 # left_wall_dofs = locate_dofs_geometrical(Q, left_wall)
 # bc_inflow = dirichletbc(PETSc.ScalarType(8), left_wall_dofs, Q)
+
+# pin pressure with bc at corner
+# upper_right_corner_pressure_dofs = locate_dofs_geometrical(Q, upper_right_corner)
+# bcp_upper_right_corner = dirichletbc(PETSc.ScalarType(0.0), upper_right_corner_pressure_dofs, Q)
+# bcp = [bcp_upper_right_corner]
 
 # right_wall_dofs = locate_dofs_geometrical(Q, right_wall)
 # bc_outflow = dirichletbc(PETSc.ScalarType(0), right_wall_dofs, Q)
 # bcp = [bc_inflow, bc_outflow]
 
-# set_bc(p_n.vector,bcp)
+set_bc(p_n.vector,bcp)
 
 # Temperature Boundary Conditions
 
@@ -481,21 +548,47 @@ T_n.x.array[:] = PETSc.ScalarType(T_f)
 
 
 # apply BCs to non-dimensional temperature from Oeurtatani et al. 2008
-print("applying bottom wall temp = {}".format(T0_bottom_wall))
+# print("applying bottom wall temp = {}".format(T0_bottom_wall))
+# bottom_wall_dofs = locate_dofs_geometrical(S, bottom_wall)
+# bcT_bottom_wall = dirichletbc(
+#     PETSc.ScalarType(T0_bottom_wall), bottom_wall_dofs, S
+# )
+
+# nonuniform temperature bc along bottom wall
+# heated_cells = locate_entities(mesh, mesh.geometry.dim, lambda x: x[0] < (0.75*x_max))
+rampdown_cells = locate_entities(mesh, mesh.geometry.dim, lambda x: x[0] > (0.75*x_max))
+T_bottom = Function(S)
+# T_bottom.interpolate(lambda x: np.full((1, x.shape[1]), T_ambient, dtype=PETSc.ScalarType)) # how do I initialize as a constant?
+T_bottom.interpolate(lambda x: np.full((1, x.shape[1]), T0_bottom_wall, dtype=PETSc.ScalarType)) # how do I initialize as a constant?
 bottom_wall_dofs = locate_dofs_geometrical(S, bottom_wall)
-bcT_bottom_wall = dirichletbc(
-    PETSc.ScalarType(T0_bottom_wall), bottom_wall_dofs, S
-)
+bottom_wall_temperature = LowerWallTemperature()
+# T_bottom.interpolate(bottom_wall_temperature, heated_cells)
+T_bottom.interpolate(bottom_wall_temperature, rampdown_cells)
+bcT_bottom_wall = dirichletbc(T_bottom, bottom_wall_dofs)
 
-print("applying top wall temp = {}".format(T0_top_wall))
-top_wall_dofs = locate_dofs_geometrical(S, top_wall)
-bcT_top_wall = dirichletbc(
-    PETSc.ScalarType(T0_top_wall), top_wall_dofs, S
-)
 
-bcT = [bcT_top_wall, bcT_bottom_wall]
+# upper_cells = locate_entities(mesh, mesh.geometry.dim, lambda x: x[1] > d0 + z0)
+# u_inlet = Function(V)
+# u_inlet.interpolate(lambda x: np.zeros((mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType))
+# left_wall_dofs = locate_dofs_geometrical(V, left_wall)
+# inlet_velocity = InletVelocity()
+# u_inlet.interpolate(inlet_velocity, upper_cells)
+# bcu_inflow = dirichletbc(u_inlet, left_wall_dofs)
+
+# print("applying top wall temp = {}".format(T0_top_wall))
+# top_wall_dofs = locate_dofs_geometrical(S, top_wall)
+# bcT_top_wall = dirichletbc(
+#     PETSc.ScalarType(T0_top_wall), top_wall_dofs, S
+# )
+
+left_wall_dofs = locate_dofs_geometrical(S, left_wall)
+bcT_left_wall = dirichletbc(PETSc.ScalarType(T_ambient), left_wall_dofs, S)
+
+# bcT = [bcT_top_wall, bcT_bottom_wall]
+bcT = [bcT_left_wall, bcT_bottom_wall]
 
 set_bc(T_n.vector,bcT)
+# exit()
 
 # bcT = [bcT_bottom_wall, bcT_right_wall]
 
@@ -575,7 +668,6 @@ L1 = form(rhs(F1))
 
 # step 2: pressure correction
 a2 = form(inner(nabla_grad(p), nabla_grad(q)) * dx)
-
 if use_pressure_in_F1:
     L2 = form(dot(nabla_grad(p_), nabla_grad(q))*dx - (rho / dt) * div(u_) * q * dx)  # needs to be reassembled
 else:
