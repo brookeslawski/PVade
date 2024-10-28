@@ -92,8 +92,7 @@ ny = 40 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min)/h)
 T_ambient = 300.0
 T0_top_wall = T_ambient
 T0_bottom_wall = T_ambient + 20.0
-T0_pv_panel = T_ambient + 20.0 # only used if pv_panel_flag == True
-
+T0_pv_panel = T_ambient + 40.0 # only used if pv_panel_flag == True
 
 # # uniform inflow
 # inflow = 'uniform'
@@ -101,11 +100,10 @@ T0_pv_panel = T_ambient + 20.0 # only used if pv_panel_flag == True
 
 # loglaw influw
 inflow = 'loglaw'
-u_hub = 1.0
+u_hub = 0.1 #1.0
 z_hub = 0.12
 z0 = 0.005
 d0 = 0.0 # 0.65*z_hub
-
 
 # Gasteuil et al 2007
 # def_hot_wall = 100.0 # 10.1 # 100.0
@@ -118,7 +116,6 @@ d0 = 0.0 # 0.65*z_hub
 # T0_top_wall = 39+273.15 # 320.50 # 300.000 # 0
 # T0_bottom_wall = 19+273.15 # 320.5007685957619775737  #300.00109 # 0 #1
 
-
 # deltaT = T0_bottom_wall - T0_top_wall
 # T_avg = (T0_top_wall+T0_bottom_wall)/2.
 # T_f = T_avg # (deltaT/2.)+T0_top_wall
@@ -130,7 +127,7 @@ stabilizing = False
 pv_panel_flag = True  # empty domain or with a pv panel in the center?
 
 save_fn = 'temp_panel'
-t_final = 2.0 # 10.0 # 20.0 # 120.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+t_final = 1.0 # 1.0 # 10.0 # 20.0 # 120.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
 dt_num = 0.01 # 0.01 #0.001
 # ================================================================
 # Build Mesh
@@ -223,13 +220,15 @@ else:
 # cp_f = 4.179*1000 # J/kg*K
 
 # calc alpha from Incropera for air at 300 K
-# g_f = -9.81
-# beta_f = 1/300.0 # [1/K]
-# nu_f = 15.89e-6 # 0.01 # 15.89e-6 # 0.01 # [m2/s]
-# # k_f = 0.0263 # W/m*K
-# alpha_f = 22.5/10**6 # m2/s
-# rho_f = 1.1314 # kg/m3
-# # cp_f = 1.004*1000 # J/kg*K
+g_f = -9.81
+beta_f = 1/300.0 # [1/K]
+nu_f = 15.89e-6 # 0.01 # 15.89e-6 # 0.01 # [m2/s] kinematic viscosity
+# k_f = 0.0263 # W/m*K
+alpha_f = 0.1*22.5/10**6 # m2/s
+# alpha_f = 0.1 # m2/s
+rho_f = 1.1314 # kg/m3
+# cp_f = 1.004*1000 # J/kg*K
+mu_f = nu_f * rho_f # dynamic viscosity
 
 # # alpha_f = k_f/(rho_f*cp_f) # m2/s
 
@@ -242,11 +241,11 @@ else:
 # rho_f = 993.88 #998.57 # kg/m3
 
 # from https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code1.html
-g_f = -98.1
-beta_f = 0.01
-alpha_f = 0.01 #22.5/10**6 # m2/s
-rho_f = 1.0 # kg/m3
-mu_f = 0.01
+# g_f = -98.1
+# beta_f = 0.01
+# alpha_f = 0.01 #22.5/10**6 # m2/s
+# rho_f = 1.0 # kg/m3
+# mu_f = 0.01
 
 # mu_f = nu_f * rho_f
 
@@ -480,7 +479,8 @@ if pv_panel_flag:
 
     bcu.append(bcu_internal_walls)
 
-set_bc(u_n.vector,bcu)
+u_n.interpolate(u_inlet)
+# set_bc(u_n.vector,bcu)
 
 # Pressure Boundary Conditions
 right_wall_entities = locate_entities_boundary(mesh, mesh.geometry.dim-1, right_wall)
@@ -528,7 +528,7 @@ T_r = Constant(mesh, PETSc.ScalarType(T_f))
 # T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
 T_n.x.array[:] = PETSc.ScalarType(T_f)
 
-# theta_n.x.array[:] = PETSc.ScalarType(T_f)
+# theta.x.array[:] = PETSc.ScalarType(T_f)
 
 # u_.x.array[:] = PETSc.ScalarType(1.0)
 
@@ -584,7 +584,7 @@ if pv_panel_flag:
     # bcT = [bcT_top_wall, bcT_bottom_wall, bcT_internal_walls]
     bcT.append(bcT_internal_walls)
 
-set_bc(T_n.vector,bcT)
+# set_bc(T_n.vector,bcT)
 # print('bcT = ',bcT)
 
 # bcT = [T_bc]
@@ -597,7 +597,6 @@ set_bc(T_n.vector,bcT)
 # bcp_right_wall = dirichletbc(PETSc.ScalarType(pressure_bc), right_wall_dofs, Q)
 
 # bcp = []  # [bcp_left_wall, bcp_right_wall, bcp_bottom_wall, bcp_top_wall]
-# TODO - pin pressure
 
 # ================================================================
 # Build All Forms
@@ -636,7 +635,7 @@ F1 = (rho / dt) * inner(u - u_n, v) * dx
 F1 += rho * inner(dot(U_AB, nabla_grad(U_CN)), v) * dx # convection
 # # F1 += mu * inner(div(grad(u)), (v)) * dx
 F1 += mu * inner(grad(U_CN), grad(v)) * dx # viscosity # + or - ??
-F1 -= beta * inner((T_n-T_r) * g, v) * dx # buoyancy
+# F1 -= beta * inner((T_n-T_r) * g, v) * dx # buoyancy
 if use_pressure_in_F1:
     F1 += inner(grad(p_), v) * dx
 
@@ -679,8 +678,6 @@ else:
 # )  # needs to be reassembled bc of u_
 # L4 = form((rho*cp / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
 
-
-
 # if stabilizing:
 #     # Pe = Constant(mesh, PETSc.ScalarType(1e10))
 #     h = CellDiameter(mesh)
@@ -692,12 +689,16 @@ else:
 #     s=s+tau*inner(u_,grad(s))
 
 if stabilizing:
-    # Residual, think this is just writing the "strong" governing equation?
+    # Residual, think this is just writing the "strong" governing equation? yes
     # T_mid = 0.5*(T_n + theta) # Crank-Nicholsen for temperature??
-    r = (1 / dt)*(theta - T_n) + dot(u_, nabla_grad(theta)) - alpha*div(grad(theta))
+    r = (1 / dt)*(theta - T_n) + dot(u_, nabla_grad(theta)) - alpha*div(grad(theta)) # this is the one
     # r = (1 / dt)*(theta - T_n) - alpha*div(grad(theta))
-    # r = dot(u_, nabla_grad(theta)) - alpha*div(grad(theta))
-    # r = -alpha*div(grad(theta))
+    # r = dot(u_, nabla_grad(theta)) - alpha*div(grad(theta)) # gives NaNs
+    # r = -alpha*div(grad(theta)) # no NaNs
+    # r = (1 / dt)*(theta - T_n) - alpha*div(grad(theta)) # gives NaNs
+    # r = (1 / dt)*(theta - T_n) # gives NaNs
+    # r = dot(u_, nabla_grad(theta)) # gives NaNs
+    # r = dot(u_, u_) # no NaNs
     # r = 1.0
 
 # how to print these terms?
@@ -708,7 +709,7 @@ F4 += inner(dot(u_, nabla_grad(theta)), s) * dx
 if stabilizing:
     # Add SUPG stabilisation terms 
     # https://fenicsproject.org/qa/13458/how-implement-supg-properly-advection-dominated-equation/
-    vnorm = sqrt(dot(u_, u_))
+    vnorm = sqrt(dot(u_, u_)) 
     h = CellDiameter(mesh)
     delta = h/(2.0*vnorm)
     stab = delta * dot(u_, grad(s)) * r * dx
@@ -790,17 +791,6 @@ solver4 = PETSc.KSP().create(mesh.comm)
 solver4.setType(PETSc.KSP.Type.PREONLY)
 pc4 = solver4.getPC()
 pc4.setType(PETSc.PC.Type.LU)
-# solver1 = PETSc.KSP().create(mesh.comm)
-# # solver1.setOperators(A1)
-# solver1.setType(PETSc.KSP.Type.BCGS)
-# pc1 = solver1.getPC()
-# pc1.setType(PETSc.PC.Type.JACOBI)
-
-# solver = PETSc.KSP().create(domain.comm)
-# solver.setOperators(A)
-# solver.setType(PETSc.KSP.Type.PREONLY)
-# solver.getPC().setType(PETSc.PC.Type.LU)
-
 
 # ================================================================
 # Begin Time Iteration
@@ -857,11 +847,6 @@ while t < t_final + eps:
     solver2.setOperators(A2)
     solver3.setOperators(A3)
 
-    A4.zeroEntries()
-    A4 = assemble_matrix(A4, a4, bcs=bcT)
-    A4.assemble()
-    solver4.setOperators(A4)
-
     # Step 1: Tentative velocity solve
     with b1.localForm() as loc_1:
         loc_1.set(0)
@@ -893,6 +878,11 @@ while t < t_final + eps:
     # print('T_.x.array[0:05] = ',T_.x.array[0:5]) # how to print theta?
     # print('T_n.x.array[0:5] = ',T_n.x.array[0:5])
     # print('u_.x.array[0:5] = ',u_.x.array[0:5])
+
+    A4.zeroEntries()
+    A4 = assemble_matrix(A4, a4, bcs=bcT)
+    A4.assemble()
+    solver4.setOperators(A4)
     
     # Step 4: Temperature corrrection step
     with b4.localForm() as loc_4:
