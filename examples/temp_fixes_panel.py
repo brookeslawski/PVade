@@ -58,11 +58,6 @@ from ufl import (
     sym,
     sqrt,
     CellDiameter,
-    lt,
-    gt,
-    conditional,
-    cosh,
-    sinh,
 )
 
 # ================================================================
@@ -78,20 +73,6 @@ y_max = 0.4 #1.0 #3.0
 # h = 0.05
 nx = 120 # 50 # 100 # 100 # 50  # 150 # int((x_max - x_min)/h)
 ny = 40 # 50 # 100 # 150 #.5*.02/.1 30 # 10 # 50  # 50 # int((y_max - y_min)/h)
-
-# values from Example 9.1 in Incropera
-# T0_top_wall = 25+273.15 # 300.0 # 300.000 # 0
-# T0_bottom_wall = 70.+273.15 # 300.00109 # 0 #1
-
-# T_film = 300.0 # K
-# T_delta = 0.0 # delta from T_film
-# T0_top_wall = T_film - T_delta
-# T0_bottom_wall = T_film + T_delta
-
-# # heated channel
-# T_ambient = 300.0
-# T0_top_wall = 350.0
-# T0_bottom_wall = 350.0
 
 # flow over a flat plate
 T_ambient = 300.0
@@ -122,8 +103,9 @@ save_fn = 'temp_panel_stab'
 
 pv_panel_flag = True  # empty domain or with a pv panel in the center?
 
-t_final = 2.0 # 1.0 # 10.0 # 20.0 # 120.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+t_final = 20.0 # 1.0 # 10.0 # 20.0 # 120.0
 dt_num = 0.01 # 0.01 #0.001
+
 # ================================================================
 # Build Mesh
 # ================================================================
@@ -196,12 +178,6 @@ else:
     )
 
 
-# Two key physical parameters are the Rayleigh number (Ra), which
-# measures the ratio of energy from buoyant forces to viscous
-# dissipation and heat conduction and the
-# Prandtl number (Pr), which measures the ratio of viscosity to heat
-# conduction.
-
 # ================================================================
 # Define Constants
 # ================================================================
@@ -227,17 +203,8 @@ rho_f = 1.1314 # kg/m3
 # cp_f = 1.004*1000 # J/kg*K
 mu_f = nu_f * rho_f # dynamic viscosity
 # k_f = 0.0263 # W/m*K
-# alpha_f = 0.1 # m2/s
 
 # # alpha_f = k_f/(rho_f*cp_f) # m2/s
-
-# from Gasteuil et al 2007
-# g_f = -98.1
-# # beta_f = 2.95e-4
-# beta_f = 0.3
-# nu_f = 8.17e-7
-# alpha_f = 1.48e-7
-# rho_f = 993.88 #998.57 # kg/m3
 
 # from https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code1.html
 # g_f = -9.81
@@ -245,8 +212,6 @@ mu_f = nu_f * rho_f # dynamic viscosity
 # alpha_f = 0.01 #22.5/10**6 # m2/s
 # rho_f = 1.0 # kg/m3
 # mu_f = 0.01
-
-# mu_f = nu_f * rho_f
 
 Ra = (g_f*beta_f/(nu_f*alpha_f))*(T0_bottom_wall-T0_top_wall)*(y_max-y_min)
 Pe_approx = u_hub * l_characteristic / (2.0 * alpha_f)
@@ -260,59 +225,11 @@ print('Pe approx = {:.2E}'.format(Pe_approx))
 print('Re approx = {:.2E}'.format(Re_approx))
 # exit()
 
-# Ra = Constant(1e8)
-# Ra = Constant(mesh, PETSc.ScalarType(1e5))
-# # Ra = Constant(mesh, PETSc.ScalarType(2500))
-
-# Pr = Constant(mesh, PETSc.ScalarType(0.7))
-
-# g = Constant(mesh, PETSc.ScalarType((0, 1)))
 g = Constant(mesh, PETSc.ScalarType((0, g_f))) # negative? YES
-# g = Constant(mesh, PETSc.ScalarType((0, -9.81))) # negative? YES
-# g = Constant(mesh, PETSc.ScalarType((0, -98.1)))
-# g = Constant(mesh, PETSc.ScalarType((0, -9800000.1)))
-# g = Constant(mesh, PETSc.ScalarType((0, 0)))
-
-# nu = Constant(mesh, PETSc.ScalarType(1))
-# nu = Constant(mesh, PETSc.ScalarType(15.89e-6)) # kinematic viscosity
-
-# beta = Constant(mesh, PETSc.ScalarType(1/300)) # thermal expansion coefficient # Incroprera
-# beta = Constant(mesh, PETSc.ScalarType(1./T_f)) # thermal expansion coefficient # Incroprera
-# beta = Constant(mesh, PETSc.ScalarType(1/T0_bottom_wall)) # thermal expansion coefficient # Incroprera
-# beta = Constant(mesh, PETSc.ScalarType(1))
-
-# alpha = Constant(mesh, PETSc.ScalarType(22.5e-6)) # thermal diffusivity [m2/s]
-# alpha = Constant(mesh, PETSc.ScalarType(26.2e-6)) # thermal diffusivity [m2/s]
-# k = Constant(mesh, PETSc.ScalarType(26.3e-3)) # thermal conductivity [W/mK]
-
-# rho = Constant(mesh, PETSc.ScalarType(1.1614)) # density [kg/m3]
-# rho = Constant(mesh, PETSc.ScalarType(1.0782)) # density [kg/m3]
-
-# mu = Constant(mesh, PETSc.ScalarType(184.6e-7)) # dynamic viscosity [Ns/m2]
-# mu = Constant(mesh, PETSc.ScalarType(196.4e-7)) # dynamic viscosity [Ns/m2]
-
-# from Gasteuil et al 2007 and Incropera
-# beta = Constant(mesh, PETSc.ScalarType(2.95e-4)) # [1/K] thermal expansion coefficient (also alpha)
-# beta = Constant(mesh, PETSc.ScalarType(2.76e-4)) # [1/K] thermal expansion coefficient
 beta = Constant(mesh, PETSc.ScalarType(beta_f)) # [1/K] thermal expansion coefficient
-# beta = Constant(mesh, PETSc.ScalarType(0.01)) # [1/K] thermal expansion coefficient
-# alpha = Constant(mesh, PETSc.ScalarType(1.48e-4)) # thermal diffusivity [m2/s]
-# alpha = Constant(mesh, PETSc.ScalarType(1.48e-7)) # thermal diffusivity [m2/s]
 alpha = Constant(mesh, PETSc.ScalarType(alpha_f)) # thermal diffusivity [m2/s]
-# alpha = Constant(mesh, PETSc.ScalarType(0.01)) # thermal diffusivity [m2/s] # this is 1e-4
-# rho = Constant(mesh, PETSc.ScalarType(993.88)) # density [kg/m3]
 rho = Constant(mesh, PETSc.ScalarType(rho_f)) # density [kg/m3]
-# rho = Constant(mesh, PETSc.ScalarType(1.0)) # density [kg/m3]
-# rho = Constant(mesh, PETSc.ScalarType(10.0)) # density [kg/m3]
-# cp = Constant(mesh, PETSc.ScalarType(cp_f)) # [J/kg*K]
-# k = Constant(mesh, PETSc.ScalarType(k_f)) # [W/m*K]
-# mu = Constant(mesh, PETSc.ScalarType(812.e-6)) # dynamic viscosity [Ns/m2]
-# mu = Constant(mesh, PETSc.ScalarType(8.55e-4)) # dynamic viscosity [Ns/m2]
-# mu = Constant(mesh, PETSc.ScalarType(0.01)) # dynamic viscosity [Ns/m2] # Re = 100
 mu = Constant(mesh, PETSc.ScalarType(mu_f)) # dynamic viscosity [Ns/m2] # Re = 100
-# mu = Constant(mesh, PETSc.ScalarType(0.0025)) # dynamic viscosity [Ns/m2] # Re = 400
-# nu = Constant(mesh, PETSc.ScalarType(8.6026e-07)) # kinematic viscosity [m3/kg]
-
 
 dt = Constant(mesh, PETSc.ScalarType(dt_num))
 
@@ -347,10 +264,6 @@ s = TestFunction(S)
 T_n = Function(S)  # for outputting T, calculated from theta for each timestep
 T_n.name = "T_n"
 T_ = Function(S)
-# T_r = Function(S)  # for outputting T, calculated from theta for each timestep
-# theta_n = Function(S)
-# theta_n.name = "theta_n"
-# theta_ = Function(S)
 
 # %% ================================================================
 # Build Boundary Conditions
@@ -369,17 +282,6 @@ class InletVelocity():
         elif inflow == 'loglaw':
             # values[0] = ((u_hub) * np.log(((x[1]) - d0) / z0) / (np.log((z_hub - d0) / z0)))
             values[0] = ((u_hub) * np.log(((x[1]) - d0) / z0) / (np.log((z_hub - d0) / z0)))
-
-            # print(values[0]) # might need fixing close to the ground
-
-            # h_panel = 0.15
-            # u_star = 0.45
-            # kappa = 0.41
-            # z0 = 0.005
-            # d0 = 0.65*h_panel
-            # values[0] = (u_star/kappa)*(np.log((x[1]-d0)/z0))
-
-            # exit()
         return values
     
 class LowerWallTemperature():
@@ -389,16 +291,8 @@ class LowerWallTemperature():
 
     def __call__(self, x):
         values = np.zeros((1, x.shape[1]), dtype=PETSc.ScalarType)
-        # print('x.shape temp = ', x.shape)
-        # print('x.shape[0] = ', x.shape[0])
-        # print('x.shape[1] = ', x.shape[1])
-        # exit()
-        # values[0] = T0_bottom_wall
         x0 = 0.75 * x_max # start of ramp down
         values[0] = (T0_bottom_wall + ((x[0]-x0) / x_max) * (T_ambient - T0_bottom_wall))
-        # print(values[0]) # might need fixing close to the ground
-        # exit()
-
         return values
 
 def left_wall(x):
@@ -425,13 +319,6 @@ def internal_boundaries(x):
     y_test = np.logical_and(y_min + tol < x[1], x[1] < y_max - tol)
     return np.logical_and(x_test, y_test)
 
-
-# pin pressure with bc at corner
-# bottom_left_corner_pressure_dofs = locate_dofs_geometrical(Q, bottom_left_corner)
-# bcp_bottom_left_corner = dirichletbc(0.0, bottom_left_corner_pressure_dofs, Q)
-# bcp = [bcp_bottom_left_corner]
-# # bcp = []
-
 # Velocity Boundary Conditions
 # Inlet
 if inflow == 'loglaw':
@@ -451,26 +338,15 @@ else:
 
 bcu_inflow = dirichletbc(u_inlet, left_wall_dofs)
 
-# print(np.shape(u_inlet.x.array[:]))
-# exit()
-
-# left_wall_dofs = locate_dofs_geometrical(V, left_wall)
 u_noslip = np.array((0,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
 # u_inflow = np.array((1,0), dtype=PETSc.ScalarType) # ux, uy = 1, 0
-
-# u_lid = np.array((1,0), dtype=PETSc.ScalarType) # ux, uy = 1, 0
-# u_noslip = np.array((10,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
-# bcu_left_wall = dirichletbc(u_noslip, left_wall_dofs, V)
-# bcu_left_wall = dirichletbc(PETSc.ScalarType(2.0), left_wall_dofs, V)
-
-# right_wall_dofs = locate_dofs_geometrical(V, right_wall)
-# bcu_right_wall = dirichletbc(u_noslip, right_wall_dofs, V)
-# bcu_right_wall = dirichletbc(u_inflow, right_wall_dofs, V)
 
 bottom_wall_dofs = locate_dofs_geometrical(V, bottom_wall)
 bcu_bottom_wall = dirichletbc(u_noslip, bottom_wall_dofs, V)
 
+# u_lid = np.array((1,0), dtype=PETSc.ScalarType) # ux, uy = 1, 0
 # top_wall_dofs = locate_dofs_geometrical(V, top_wall)
+# bcu_top_wall = dirichletbc(u_lid, top_wall_dofs, V)
 # bcu_top_wall = dirichletbc(u_noslip, top_wall_dofs, V)
 
 # slip at top wall
@@ -479,9 +355,6 @@ top_wall_dofs = locate_dofs_topological(V.sub(1), mesh.geometry.dim-1, top_wall_
 zero_scalar = Constant(mesh, PETSc.ScalarType(0.0))
 bcu_top_wall = dirichletbc(zero_scalar, top_wall_dofs, V.sub(1))
 
-# bcu_top_wall = dirichletbc(u_lid, top_wall_dofs, V)
-
-# bcu = [bcu_left_wall, bcu_right_wall, bcu_bottom_wall, bcu_top_wall]
 bcu = [bcu_inflow, bcu_bottom_wall, bcu_top_wall]
 
 if pv_panel_flag:
@@ -503,55 +376,16 @@ zero_scalar = Constant(mesh, PETSc.ScalarType(0.0))
 bcp_outlet = dirichletbc(zero_scalar, right_wall_dofs, Q)
 bcp = [bcp_outlet]
 
-# left_wall_dofs = locate_dofs_geometrical(Q, left_wall)
-# bc_inflow = dirichletbc(PETSc.ScalarType(8), left_wall_dofs, Q)
-
-# pin pressure with bc at corner
-# upper_right_corner_pressure_dofs = locate_dofs_geometrical(Q, upper_right_corner)
-# bcp_upper_right_corner = dirichletbc(PETSc.ScalarType(0.0), upper_right_corner_pressure_dofs, Q)
-# bcp = [bcp_upper_right_corner]
-
-# right_wall_dofs = locate_dofs_geometrical(Q, right_wall)
-# bc_outflow = dirichletbc(PETSc.ScalarType(0), right_wall_dofs, Q)
-# bcp = [bc_inflow, bc_outflow]
-
 set_bc(p_n.vector,bcp)
 
 # Temperature Boundary Conditions
-
-# non-dimensional temperature
-# if T0_bottom_wall != T0_top_wall:
-#     DeltaT = (
-#         T0_bottom_wall - T0_top_wall
-#     )  # ? should this be defined as Constant(mesh, PETSc.ScalarType(bottom-top)) ?
-# else:
-#     DeltaT = 1 # to avoid divide by zero errors; tested on neutral state and temps stay at zero through entire sim of 0.4s
-# # warning: the above logic produces different theta for the pv in neutral vs unstable ABL conditions; fix later
-
-# reference temperature from Oeurtatani et al. 2008
-# T_r = 0.5*(T0_bottom_wall + T0_top_wall) 
-# T_r.x.array[:] = PETSc.ScalarType(300.0)
-# T_r = Constant(mesh, PETSc.ScalarType(300.0))
 T_r = Constant(mesh, PETSc.ScalarType(T_f))
-
-# non-dim temperatures at top and bottom walls
-# theta0_bottom_wall = (T0_bottom_wall - T_r) / DeltaT # from Oeurtatani et al. 2008
-# theta0_top_wall = (T0_top_wall - T_r) / DeltaT # from Oeurtatani et al. 2008
 
 # Interpolate initial temperature vertically for a smooth gradient
 # T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
+
+# Initialize constant fluid temperature everywhere in domain
 T_n.x.array[:] = PETSc.ScalarType(T_f)
-
-# theta.x.array[:] = PETSc.ScalarType(T_f)
-
-# u_.x.array[:] = PETSc.ScalarType(1.0)
-
-# Set initial velocity?
-# u_n.x.array[:] = PETSc.ScalarType(0.0)
-# u_n.x[1].array[:] = PETSc.ScalarType(1.0)
-
-# non-dimensional temperature
-# theta_n.x.array[:] = (T_n.x.array[:] - T_r) / DeltaT # from Oeurtatani et al. 2008
 
 # nonuniform temperature bc along bottom wall
 if t_bc_flag == 'rampdown':
@@ -573,26 +407,13 @@ elif t_bc_flag == 'stepchange':
 
 bcT_bottom_wall = dirichletbc(T_bottom, bottom_wall_dofs)
 
-# print("applying top wall temp = {}".format(T0_top_wall))
-# top_wall_dofs = locate_dofs_geometrical(S, top_wall)
-# bcT_top_wall = dirichletbc(
-#     PETSc.ScalarType(T0_top_wall), top_wall_dofs, S
-# )
-
 left_wall_dofs = locate_dofs_geometrical(S, left_wall)
 bcT_left_wall = dirichletbc(PETSc.ScalarType(T_ambient), left_wall_dofs, S)
 
-# bcT = [bcT_top_wall, bcT_bottom_wall]
 bcT = [bcT_left_wall, bcT_bottom_wall]
-
-
 # exit()
 
-# bcT = [bcT_bottom_wall, bcT_right_wall]
-
 if pv_panel_flag:
-
-    # theta0_panel = (T0_pv_panel - T_r) / DeltaT # from Oeurtatani et al. 2008
 
     print("applying pv panel temp = {}".format(T0_pv_panel))
     boundary_facets = locate_entities_boundary(
@@ -603,47 +424,14 @@ if pv_panel_flag:
         PETSc.ScalarType(T0_pv_panel), boundary_dofs, S
     )
 
-    # bcT = [bcT_top_wall, bcT_bottom_wall, bcT_internal_walls]
     bcT.append(bcT_internal_walls)
 
-# set_bc(T_n.vector,bcT)
-# print('bcT = ',bcT)
-
-# bcT = [T_bc]
-
-# Pressure Boundary Conditions from fenics code
-# pressure_bc = 0
-# bcp_bottom_wall = dirichletbc(PETSc.ScalarType(pressure_bc), bottom_wall_dofs, Q)
-# bcp_top_wall = dirichletbc(PETSc.ScalarType(pressure_bc), top_wall_dofs, Q)
-# bcp_left_wall = dirichletbc(PETSc.ScalarType(pressure_bc), left_wall_dofs, Q)
-# bcp_right_wall = dirichletbc(PETSc.ScalarType(pressure_bc), right_wall_dofs, Q)
-
-# bcp = []  # [bcp_left_wall, bcp_right_wall, bcp_bottom_wall, bcp_top_wall]
 
 # ================================================================
 # Build All Forms
 # ==================================================================
 
 # step 1: tentative velocity
-# chorin (removed the pressure term)
-# F1 = (1 / Pr) * (
-#     (1 / dt) * inner(u - u_n, v) * dx + inner(nabla_grad(u_n) * u_n, v) * dx
-# )  # this might be dot not * ?
-# F1 += nu * inner(nabla_grad(u), nabla_grad(v)) * dx
-# F1 -= Ra * inner(theta_n * g, v) * dx
-
-# using nu
-# # # F1 = (1 / dt) * inner(u - u_n, v) * dx + inner(nabla_grad(u_n) * u_n, v) * dx
-# # # F1 += nu * inner(nabla_grad(u), nabla_grad(v)) * dx
-# # # F1 += beta * inner((T_n-T_r) * g, v) * dx
-# F1 = (1 / dt) * inner(u - u_n, v) * dx + inner(dot(u_n, nabla_grad(u_n)), v) * dx
-# F1 -= nu * inner(nabla_grad(u), nabla_grad(v)) * dx
-# F1 -= beta * inner((T_n-T_r) * g, v) * dx
-
-# using rho and mu
-# F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(dot(u_n, nabla_grad(u_n)), v) * dx # convection
-# # F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * inner(nabla_grad(u_n) * u_n, v) * dx # convection
-# F1 = (rho / dt) * inner(u - u_n, v) * dx + rho * (inner(nabla_grad(u_n) * u_n, v) * dx ) # convection
 
 # Crank-Nicolson velocity
 U_CN = 0.5 * (u + u_)
@@ -670,7 +458,6 @@ if use_pressure_in_F1:
     L2 = form(dot(nabla_grad(p_), nabla_grad(q))*dx - (rho / dt) * div(u_) * q * dx)  # needs to be reassembled
 else:
     L2 = form( - (rho / dt) * div(u_) * q * dx)  # needs to be reassembled
-# L2 = form(-(1 / dt) * div(u_) * q * dx)  # needs to be reassembled
 
 # step 3: velocity update
 a3 = form(inner(u, v) * dx)  # doesn't need to be reassembled
@@ -678,73 +465,15 @@ if use_pressure_in_F1:
     L3 = form(inner(u_, v) * dx - (dt/rho) * inner(grad(p_ - p_n), v) * dx) # u_ is known
 else:
     L3 = form(inner(u_, v) * dx - (dt/rho) * inner(grad(p_), v) * dx) # u_ is known
-# L3 = form(inner(u_, v) * dx - dt * inner(nabla_grad(p_), v) * dx) # u_ is known
-
-
-# # step 4: temperature
-# a4 = form(
-#     (1 / dt) * inner(theta, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
-#     + alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx # diffusivity
-#     + inner(dot(u_, nabla_grad(theta)), s) * dx # advection of temperature
-#     + stab
-# )  # needs to be reassembled bc of u_
-# L4 = form((1 / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
-
-# rho cp and k - wait I don't know about the dts in here
-# a4 = form(
-#     (rho*cp / dt) * inner(theta, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
-#     + alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx # diffusivity
-#     + rho*cp * inner(dot(u_, nabla_grad(theta)), s) * dx # advection of temperature
-# )  # needs to be reassembled bc of u_
-# L4 = form((rho*cp / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
-
-# if stabilizing:
-#     # Pe = Constant(mesh, PETSc.ScalarType(1e10))
-#     h = CellDiameter(mesh)
-#     unorm = sqrt(inner(u_,u_)) # ??
-#     Pe = (unorm*h)/(2.0*alpha)
-#     # print('Peclet number = ', Pe)
-#     # nb = sqrt(inner(u_,u_))
-#     tau = 0.5*h*pow(4.0/(Pe*h)+2.0*unorm,-1.0)
-#     s=s+tau*inner(u_,grad(s))
 
 if stabilizing:
-    # Residual, think this is just writing the "strong" governing equation? yes
-    # T_mid = 0.5*(T_n + theta) # Crank-Nicholsen for temperature??
+    # Residual, the "strong" form of the governing equation
     r = (1 / dt)*(theta - T_n) + dot(u_, nabla_grad(theta)) - alpha*div(grad(theta)) # this is the one
-    # r = (1 / dt)*(theta - T_n) - alpha*div(grad(theta))
-    # r = dot(u_, nabla_grad(theta)) - alpha*div(grad(theta)) # gives NaNs
-    # r = -alpha*div(grad(theta)) # no NaNs
-    # r = (1 / dt)*(theta - T_n) - alpha*div(grad(theta)) # gives NaNs
-    # r = (1 / dt)*(theta - T_n) # gives NaNs
-    # r = dot(u_, nabla_grad(theta)) # gives NaNs
-    # r = dot(u_, u_) # no NaNs
-    # r = 1.0
 
 # how to print these terms?
 F4 = (1 / dt) * inner(theta - T_n, s) * dx # theta = unknown, T_n = temp from previous timestep
 F4 += alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx
 F4 += inner(dot(u_, nabla_grad(theta)), s) * dx
-
-
-# for calculation of tau
-def coth(x):
-    print(x)
-#     np.cosh(x)
-    x_lt_eps = lt(x,  0.001)
-    x_gt_eps = gt(x, -0.001)
-    
-    y = conditional(x_lt_eps,
-                        conditional(
-                            x_gt_eps, 0.0, cosh(x)/sinh(x)
-                        ),
-                       cosh(x)/sinh(x))
-    
-    return y
-
-
-def calc_beta_coeff(Pe):
-    return coth(Pe) - np.divide(1, Pe, out=np.zeros_like(Pe), where=Pe!=0)
 
 if stabilizing:
     eps = 1e-5
@@ -784,52 +513,18 @@ if stabilizing:
     tau = (h/(2*u_mag))*(1+1/Pe)**(-1)
     stab = tau * dot(u_, grad(s)) * r * dx
 
-    # h = CellDiameter(mesh)
-    # unorm = sqrt(inner(u_,u_)) # ??
-    # Pe = (unorm*h)/(2.0*alpha)
-    # # print('Peclet number = ', Pe)
-    # # nb = sqrt(inner(u_,u_))
-    # tau = 0.5*h*pow(4.0/(Pe*h)+2.0*unorm,-1.0)
-    # # s=s+tau*inner(u_,grad(s))
-    # stab = tau*inner(u_,grad(s)) * r * dx # is this even correct to multiply by r and dx?
-
     F4 += stab
 
 a4 = form(lhs(F4))  # dependent on u
 L4 = form(rhs(F4))
 
-#rho cp k
-# F4 = ((rho*cp) / dt) * inner(theta - T_n, s) * dx # theta = unknown, T_n = temp from previous timestep
-# F4 -= k * inner(nabla_grad(theta), nabla_grad(s)) * dx # diffusion
-# F4 += (rho*cp) * inner(dot(u_, nabla_grad(theta)), s) * dx # advection
-
-# a4 = form(lhs(F4))  # dependent on u
-# L4 = form(rhs(F4))
-
-# (1/dt) * inner(T - T_, v)*dx = -inner(dot(u_, grad(T)), v)*dx -K*inner(grad(T), grad(v))*dx
-
 # Solver for step 1
-# solver1 = PETSc.KSP().create(mesh.comm)
-# solver1.setType(PETSc.KSP.Type.GMRES)  # TODO - test solution with BCGS
-# pc1 = solver1.getPC()
-# pc1.setType(PETSc.PC.Type.HYPRE)
-# pc1.setHYPREType("boomeramg")
-
-# copied from Nav Stokes tutorial: https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code2.html
 solver1 = PETSc.KSP().create(mesh.comm)
-# solver1.setOperators(A1)
 solver1.setType(PETSc.KSP.Type.GMRES)
 pc1 = solver1.getPC()
 pc1.setType(PETSc.PC.Type.JACOBI)
 
 # Solver for step 2
-# solver2 = PETSc.KSP().create(mesh.comm)
-# solver2.setType(PETSc.KSP.Type.GMRES)  # TODO - test solution with BCGS
-# pc2 = solver2.getPC()
-# pc2.setType(PETSc.PC.Type.HYPRE)
-# # pc2.setHYPREType("boomeramg") # TODO - test solution with this instead (for speed?)
-
-# copied from Nav Stokes tutorial: https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code2.html
 solver2 = PETSc.KSP().create(mesh.comm)
 # solver2.setOperators(A2)
 solver2.setType(PETSc.KSP.Type.GMRES)
@@ -838,37 +533,29 @@ pc2.setType(PETSc.PC.Type.HYPRE)
 pc2.setHYPREType("boomeramg")
 
 # Solver for step 3
-# solver3 = PETSc.KSP().create(mesh.comm)
-# solver3.setType(PETSc.KSP.Type.GMRES)
-# pc3 = solver3.getPC()
-# pc3.setType(PETSc.PC.Type.JACOBI)  # TODO - test solution with SOR
 solver3 = PETSc.KSP().create(mesh.comm)
 solver3.setType(PETSc.KSP.Type.GMRES)
 pc3 = solver3.getPC()
 pc3.setType(PETSc.PC.Type.JACOBI)
 
-# copied from Nav Stokes tutorial: https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code2.html
-# solver3 = PETSc.KSP().create(mesh.comm)
-# # solver3.setOperators(A3)
-# solver3.setType(PETSc.KSP.Type.CG)
-# pc3 = solver3.getPC()
-# pc3.setType(PETSc.PC.Type.SOR)
-
 # Solver for step 4
 # solver4 = PETSc.KSP().create(mesh.comm)
-# solver4.setType(PETSc.KSP.Type.GMRES)
+# solver4.setType(PETSc.KSP.Type.GMRES) # does not work for high Pe cases without stabilization
 # pc4 = solver4.getPC()
 # pc4.setType(PETSc.PC.Type.HYPRE)
 # pc4.setHYPREType("boomeramg")
+# solver4 = PETSc.KSP().create(mesh.comm)
+# solver4.setType(PETSc.KSP.Type.PREONLY)
+# pc4 = solver4.getPC()
+# pc4.setType(PETSc.PC.Type.LU) # works
 solver4 = PETSc.KSP().create(mesh.comm)
-solver4.setType(PETSc.KSP.Type.PREONLY)
+solver4.setType(PETSc.KSP.Type.GMRES)
 pc4 = solver4.getPC()
-pc4.setType(PETSc.PC.Type.LU)
+pc4.setType(PETSc.PC.Type.LU) # needs LU to run without blowing up for high Pe cases without stabilization
 
 # ================================================================
 # Begin Time Iteration
 # ================================================================
-
 eps = 3.0e-16
 t = dt_num  # dt # 0.0
 ct = 1  # 0
@@ -897,24 +584,11 @@ A4 = assemble_matrix(a4, bcs=bcT)
 A4.assemble()
 b4 = assemble_vector(L4)
 
-# print('shape of T_n = ',np.shape(T_n.x.array[:]))
-
 while t < t_final + eps:
-    # T_n.x.array[:] = DeltaT * theta_n.x.array[:] + T_r # from Ouertatani et al. 2008
-    # T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
- 
-    # alpha.value = alpha.value*0.9
-    # if alpha.value < 1e-7:
-    #     alpha.value = 1e-7
-    # print('alpha = ',alpha.value)
-
     # ================================================================
     # Assemble and Build Solvers
     # ================================================================
 
-    # A1.zeroEntries()  # resets the matrix
-    # A1 = assemble_matrix(A1, a1, bcs=bcu)
-    # A1.assemble()
     solver1.setOperators(A1)
 
     solver2.setOperators(A2)
@@ -949,18 +623,13 @@ while t < t_final + eps:
     with b3.localForm() as loc_3:
         loc_3.set(0)
     b3 = assemble_vector(b3, L3)
-    # apply_lifting(b3, [a3], [bcu])
     b3.ghostUpdate(addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE)
     solver3.solve(b3, u_.vector)
     u_.x.scatter_forward()
-    # print('T_.x.array[0:05] = ',T_.x.array[0:5]) # how to print theta?
-    # print('T_n.x.array[0:5] = ',T_n.x.array[0:5])
-    # print('u_.x.array[0:5] = ',u_.x.array[0:5])
 
     A4.zeroEntries()
     A4 = assemble_matrix(A4, a4, bcs=bcT)
     A4.assemble()
-    # solver4.setOperators(A4)
     
     # Step 4: Temperature corrrection step
     with b4.localForm() as loc_4:
@@ -976,7 +645,6 @@ while t < t_final + eps:
     u_n.x.array[:] = u_.x.array[:]
     p_n.x.array[:] = p_.x.array[:]
     T_n.x.array[:] = T_.x.array[:]
-    # theta_n.x.array[:] = theta.x.array[:]
 
     # print(T_n.x.array[:])
     u_n_max = mesh.comm.allreduce(np.amax(u_n.vector.array), op=MPI.MAX)
@@ -989,7 +657,6 @@ while t < t_final + eps:
             xdmf.write_function(u_n, t)
             xdmf.write_function(p_n, t)
             xdmf.write_function(T_n, t)
-            # xdmf.write_function(theta_n, t)
 
         if mesh.comm.Get_rank() == 0:
             print(
@@ -1007,18 +674,3 @@ print('mu = {:.2E}'.format(mu_f))
 print('Ra = {:.2E}'.format(Ra))
 print('Pe approx = {:.2E}'.format(Pe_approx))
 print('Re approx = {:.2E}'.format(Re_approx))
-
-# visualizing variables
-# ================================================================
-
-# print(u_n.vector.array[:])
-
-# plt.scatter(mesh.geometry.x[:,0], mesh.geometry.x[:,1], s=10, c=p_k.vector.array[:])
-# plt.scatter(coords[0, :], coords[:,1], s=10, c=p_k.vector.array[:])
-# plt.show()
-
-# coords_better = V.tabulate_dof_coordinates()
-# print('size1 = ',np.shape(coords_better[0, :]))
-# print('size2 = ',np.shape(coords_better[0, :]))
-# plt.scatter(coords_better[:, 0], coords_better[:, 1], c=np.sqrt(u_k.vector.array[0::2]**2 + u_k.vector.array[1::2]**2))
-# plt.show()
