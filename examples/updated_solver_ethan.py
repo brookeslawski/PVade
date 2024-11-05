@@ -58,11 +58,6 @@ from ufl import (
     sym,
     sqrt,
     CellDiameter,
-    lt,
-    gt,
-    conditional,
-    cosh,
-    sinh,
 )
 
 # ================================================================
@@ -99,31 +94,41 @@ T0_top_wall = T_ambient
 T0_bottom_wall = T_ambient + 20.0
 T0_pv_panel = T_ambient + 40.0 # only used if pv_panel_flag == True
 
-t_bc_flag = 'stepchange'
-# t_bc_flag = 'rampdown'
-
 # # uniform inflow
 # inflow = 'uniform'
-# u0 = 0.0 # 1.0
+# u0 = 1.0
 
-# loglaw inflow
+# loglaw influw
 inflow = 'loglaw'
-u_hub = 0.5 #1.0
+u_hub = 0.1 #1.0
 z_hub = 0.12
 z0 = 0.005
 d0 = 0.0 # 0.65*z_hub
 
+# Gasteuil et al 2007
+# def_hot_wall = 100.0 # 10.1 # 100.0
+# T0_top_wall = -def_hot_wall #19+273.15 # 320.50 # 300.000 # 0
+# T0_bottom_wall = def_hot_wall # 39.3+273.15 # 320.5007685957619775737  #300.00109 # 0 #1
+# def_hot_wall = 100.0
+# T0_top_wall = -def_hot_wall #19+273.15 # 320.50 # 300.000 # 0
+# T0_bottom_wall = def_hot_wall # 39.3+273.15 # 320.5007685957619775737  #300.00109 # 0 #1
+
+# T0_top_wall = 39+273.15 # 320.50 # 300.000 # 0
+# T0_bottom_wall = 19+273.15 # 320.5007685957619775737  #300.00109 # 0 #1
+
+# deltaT = T0_bottom_wall - T0_top_wall
+# T_avg = (T0_top_wall+T0_bottom_wall)/2.
+# T_f = T_avg # (deltaT/2.)+T0_top_wall
+# ^ these are equivalent
+
 T_f = T_ambient
 
-# stabilizing = False
-# save_fn = 'temp_panel'
-stabilizing = True
-save_fn = 'temp_panel_stab'
-
+stabilizing = False
 pv_panel_flag = True  # empty domain or with a pv panel in the center?
 
-t_final = 2.0 # 1.0 # 10.0 # 20.0 # 120.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
-dt_num = 0.01 # 0.01 #0.001
+save_fn = 'temp_panel_nostab'
+t_final = 10.0 # 1.0 # 10.0 # 20.0 # 120.0 #1.0 # 10.0 #0.4 # 0.003 # 0.1  # 0.5 # 0.5 #0.1 # 0.000075
+dt_num = 0.1 # 0.01 #0.001
 # ================================================================
 # Build Mesh
 # ================================================================
@@ -163,7 +168,7 @@ if pv_panel_flag:
 
     # Rotate the panel and shift it into its correct position
     gmsh_model.occ.rotate([panel_tag], 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, panel_angle)
-    gmsh_model.occ.translate([panel_tag], 0.3 * domain_width, 0.3 * domain_height, 0.0)
+    gmsh_model.occ.translate([panel_tag], 0.5 * domain_width, 0.3 * domain_height, 0.0)
 
     # Cookie cutter step, domain = domain - panel, is how to read this
     gmsh_model.occ.cut([domain_tag], [panel_tag])
@@ -215,19 +220,17 @@ else:
 # cp_f = 4.179*1000 # J/kg*K
 
 # calc alpha from Incropera for air at 300 K
-g_f = 9.81
+g_f = -9.81
+g_f *= 0.1
 beta_f = 1/300.0 # [1/K]
 nu_f = 15.89e-6 # 0.01 # 15.89e-6 # 0.01 # [m2/s] kinematic viscosity
-nu_f *= 10
+# k_f = 0.0263 # W/m*K
 alpha_f = 22.5/10**6 # m2/s
-alpha_f *= 1 # high Pe (stab needed)
-# alpha_f *= 10 # moderate Pe
-# alpha_f *= 100 # low Pe (stab not needed)
+alpha_f *= 1.0
+# alpha_f = 0.1 # m2/s
 rho_f = 1.1314 # kg/m3
 # cp_f = 1.004*1000 # J/kg*K
 mu_f = nu_f * rho_f # dynamic viscosity
-# k_f = 0.0263 # W/m*K
-# alpha_f = 0.1 # m2/s
 
 # # alpha_f = k_f/(rho_f*cp_f) # m2/s
 
@@ -240,7 +243,7 @@ mu_f = nu_f * rho_f # dynamic viscosity
 # rho_f = 993.88 #998.57 # kg/m3
 
 # from https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code1.html
-# g_f = -9.81
+# g_f = -98.1
 # beta_f = 0.01
 # alpha_f = 0.01 #22.5/10**6 # m2/s
 # rho_f = 1.0 # kg/m3
@@ -248,17 +251,11 @@ mu_f = nu_f * rho_f # dynamic viscosity
 
 # mu_f = nu_f * rho_f
 
-Ra = (g_f*beta_f/(nu_f*alpha_f))*(T0_bottom_wall-T0_top_wall)*(y_max-y_min)
-Pe_approx = u_hub * l_characteristic / (2.0 * alpha_f)
-Re_approx = u_hub * panel_width / nu_f
+# Ra = (g_f*beta_f/(nu_f*alpha_f))*(T0_bottom_wall-T0_top_wall)*(y_max-y_min)
 
-print('g = {}'.format(g_f))
-print('alpha = {:.2E}'.format(alpha_f))
-print('mu = {:.2E}'.format(mu_f))
-print('Ra = {:.2E}'.format(Ra))
-print('Pe approx = {:.2E}'.format(Pe_approx))
-print('Re approx = {:.2E}'.format(Re_approx))
-# exit()
+print('alpha = ', alpha_f)
+print('mu = ', mu_f)
+# print('Ra = {:.2E}'.format(Ra))
 
 # Ra = Constant(1e8)
 # Ra = Constant(mesh, PETSc.ScalarType(1e5))
@@ -362,7 +359,7 @@ class InletVelocity():
 
     def __call__(self, x):
         values = np.zeros((mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType)
-        # print('x.shape vel = ', x.shape)
+        print('x.shape vel = ', x.shape)
         if inflow == 'uniform':
             values[0] = u0
 
@@ -370,7 +367,7 @@ class InletVelocity():
             # values[0] = ((u_hub) * np.log(((x[1]) - d0) / z0) / (np.log((z_hub - d0) / z0)))
             values[0] = ((u_hub) * np.log(((x[1]) - d0) / z0) / (np.log((z_hub - d0) / z0)))
 
-            # print(values[0]) # might need fixing close to the ground
+            print(values[0]) # might need fixing close to the ground
 
             # h_panel = 0.15
             # u_star = 0.45
@@ -389,14 +386,14 @@ class LowerWallTemperature():
 
     def __call__(self, x):
         values = np.zeros((1, x.shape[1]), dtype=PETSc.ScalarType)
-        # print('x.shape temp = ', x.shape)
+        print('x.shape temp = ', x.shape)
         # print('x.shape[0] = ', x.shape[0])
         # print('x.shape[1] = ', x.shape[1])
         # exit()
         # values[0] = T0_bottom_wall
         x0 = 0.75 * x_max # start of ramp down
         values[0] = (T0_bottom_wall + ((x[0]-x0) / x_max) * (T_ambient - T0_bottom_wall))
-        # print(values[0]) # might need fixing close to the ground
+        print(values[0]) # might need fixing close to the ground
         # exit()
 
         return values
@@ -434,21 +431,12 @@ def internal_boundaries(x):
 
 # Velocity Boundary Conditions
 # Inlet
-if inflow == 'loglaw':
-    upper_cells = locate_entities(mesh, mesh.geometry.dim, lambda x: x[1] > d0 + z0)
-    u_inlet = Function(V)
-    u_inlet.interpolate(lambda x: np.zeros((mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType))
-    left_wall_dofs = locate_dofs_geometrical(V, left_wall)
-    inlet_velocity = InletVelocity()
-    u_inlet.interpolate(inlet_velocity, upper_cells)
-
-else:
-    u_inlet = Function(V)
-    u_inlet.interpolate(lambda x: np.zeros((mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType))
-    left_wall_dofs = locate_dofs_geometrical(V, left_wall)
-    inlet_velocity = InletVelocity()
-    u_inlet.interpolate(inlet_velocity)
-
+upper_cells = locate_entities(mesh, mesh.geometry.dim, lambda x: x[1] > d0 + z0)
+u_inlet = Function(V)
+u_inlet.interpolate(lambda x: np.zeros((mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType))
+left_wall_dofs = locate_dofs_geometrical(V, left_wall)
+inlet_velocity = InletVelocity()
+u_inlet.interpolate(inlet_velocity, upper_cells)
 bcu_inflow = dirichletbc(u_inlet, left_wall_dofs)
 
 # print(np.shape(u_inlet.x.array[:]))
@@ -554,23 +542,15 @@ T_n.x.array[:] = PETSc.ScalarType(T_f)
 # theta_n.x.array[:] = (T_n.x.array[:] - T_r) / DeltaT # from Oeurtatani et al. 2008
 
 # nonuniform temperature bc along bottom wall
-if t_bc_flag == 'rampdown':
-    rampdown_cells = locate_entities(mesh, mesh.geometry.dim, lambda x: x[0] > (0.75*x_max))
-    T_bottom = Function(S)
-    T_bottom.interpolate(lambda x: np.full((1, x.shape[1]), T0_bottom_wall, dtype=PETSc.ScalarType)) # how do I initialize as a constant?
-    bottom_wall_dofs = locate_dofs_geometrical(S, bottom_wall)
-    bottom_wall_temperature = LowerWallTemperature()
-    T_bottom.interpolate(bottom_wall_temperature, rampdown_cells)
-
-
-elif t_bc_flag == 'stepchange':
-    heated_cells = locate_entities(mesh, mesh.geometry.dim, lambda x: x[0] < (0.75*x_max))
-    T_bottom = Function(S)
-    T_bottom.interpolate(lambda x: np.full((1, x.shape[1]), T_ambient, dtype=PETSc.ScalarType)) # how do I initialize as a constant?
-    bottom_wall_dofs = locate_dofs_geometrical(S, bottom_wall)
-    bottom_wall_temperature = LowerWallTemperature()
-    T_bottom.interpolate(bottom_wall_temperature, heated_cells)
-
+# heated_cells = locate_entities(mesh, mesh.geometry.dim, lambda x: x[0] < (0.75*x_max))
+rampdown_cells = locate_entities(mesh, mesh.geometry.dim, lambda x: x[0] > (0.75*x_max))
+T_bottom = Function(S)
+# T_bottom.interpolate(lambda x: np.full((1, x.shape[1]), T_ambient, dtype=PETSc.ScalarType)) # how do I initialize as a constant?
+T_bottom.interpolate(lambda x: np.full((1, x.shape[1]), T0_bottom_wall, dtype=PETSc.ScalarType)) # how do I initialize as a constant?
+bottom_wall_dofs = locate_dofs_geometrical(S, bottom_wall)
+bottom_wall_temperature = LowerWallTemperature()
+# T_bottom.interpolate(bottom_wall_temperature, heated_cells)
+T_bottom.interpolate(bottom_wall_temperature, rampdown_cells)
 bcT_bottom_wall = dirichletbc(T_bottom, bottom_wall_dofs)
 
 # print("applying top wall temp = {}".format(T0_top_wall))
@@ -657,7 +637,7 @@ F1 = (rho / dt) * inner(u - u_n, v) * dx
 F1 += rho * inner(dot(U_AB, nabla_grad(U_CN)), v) * dx # convection
 # # F1 += mu * inner(div(grad(u)), (v)) * dx
 F1 += mu * inner(grad(U_CN), grad(v)) * dx # viscosity # + or - ??
-F1 -= beta * inner((T_n-T_r) * g, v) * dx # buoyancy # THIS ONE WITH POSITIVE G INPUT PARAMETER
+F1 -= beta * inner((T_n-T_r) * g, v) * dx # buoyancy
 if use_pressure_in_F1:
     F1 += inner(grad(p_), v) * dx
 
@@ -690,6 +670,8 @@ else:
 # )  # needs to be reassembled bc of u_
 # L4 = form((1 / dt) * inner(T_n, s) * dx)  # needs to be reassembled bc of T_n
 
+
+
 # rho cp and k - wait I don't know about the dts in here
 # a4 = form(
 #     (rho*cp / dt) * inner(theta, s) * dx # is theta relative to some reference temperature? when this term is removed, things get weird
@@ -703,7 +685,7 @@ else:
 #     h = CellDiameter(mesh)
 #     unorm = sqrt(inner(u_,u_)) # ??
 #     Pe = (unorm*h)/(2.0*alpha)
-#     # print('Peclet number = ', Pe)
+#     print('Peclet number = ', Pe)
 #     # nb = sqrt(inner(u_,u_))
 #     tau = 0.5*h*pow(4.0/(Pe*h)+2.0*unorm,-1.0)
 #     s=s+tau*inner(u_,grad(s))
@@ -726,72 +708,14 @@ F4 = (1 / dt) * inner(theta - T_n, s) * dx # theta = unknown, T_n = temp from pr
 F4 += alpha * inner(nabla_grad(theta), nabla_grad(s)) * dx
 F4 += inner(dot(u_, nabla_grad(theta)), s) * dx
 
-
-# for calculation of tau
-def coth(x):
-    print(x)
-#     np.cosh(x)
-    x_lt_eps = lt(x,  0.001)
-    x_gt_eps = gt(x, -0.001)
-    
-    y = conditional(x_lt_eps,
-                        conditional(
-                            x_gt_eps, 0.0, cosh(x)/sinh(x)
-                        ),
-                       cosh(x)/sinh(x))
-    
-    return y
-
-
-def calc_beta_coeff(Pe):
-    return coth(Pe) - np.divide(1, Pe, out=np.zeros_like(Pe), where=Pe!=0)
-
 if stabilizing:
-    eps = 1e-5
     # Add SUPG stabilisation terms 
     # https://fenicsproject.org/qa/13458/how-implement-supg-properly-advection-dominated-equation/
-    # vnorm = sqrt(dot(u_, u_)) # magnitude of u
-    # h = CellDiameter(mesh)
-    # # delta = h/(2.0*vnorm)
-    # # delta = h/(vnorm) # "when diffusion is not important"
-    # delta = h/(vnorm + sqrt(2*alpha/h)) # "when diffusion is important (alpha > 1e-5)" THIS SEEMS TO WORK FOR BOTH LOW AND HIGH PE
-    # # if Pe_approx > 1.0: # might need to adjust this threshold value
-    # #     delta = h/(vnorm + sqrt(2*alpha/h)) # "when diffusion is important (alpha > 1e-5)"
-    # # else:
-    # #     delta = h/(vnorm) # "when diffusion is not important"
-    # # delta = (0.5*h)/(2.0*vnorm+eps)
-    # # delta = h/(2.0*sqrt(vnorm))
-    # # delta = l_characteristic/(2.0*vnorm)
-    # stab = delta * dot(u_, grad(s)) * r * dx
-    # # stab = 0.0
-
-    # coeff as a function of Peclet number
-    # u_mag = sqrt(dot(u_, u_)) # magnitude of vector
-    # h = CellDiameter(mesh)
-    # Pe = u_mag * h / (2.0 * alpha)
-    # # Pe = vnorm * h / (2.0 * alpha) # BJS check if this should be vnorm (1 of 2) - yes, u_mag
-    # beta_coeff = calc_beta_coeff(Pe) # goes to zero as Pe goes to zero
-    # # tau = beta_coeff * h / (2.0 * u_mag) # works, but some hot/cold spots
-    # tau = beta_coeff * h / (2.0 * sqrt(u_mag)) # works, but still a little ringing
-    # # tau = beta_coeff * h / (2.0 * vnorm/2) # does not work
-    # stab = tau * dot(u_, grad(s)) * r * dx
-
-    # Donea and Huerta 2003 (Eq 2.64)
+    vnorm = sqrt(dot(u_, u_)) 
     h = CellDiameter(mesh)
-    u_mag = sqrt(dot(u_, u_)) # magnitude of vector
-    # tau = ((2*u_mag/h) + (4*alpha/(h**2)))**(-1)
-    Pe = u_mag*h/(2*alpha)
-    tau = (h/(2*u_mag))*(1+1/Pe)**(-1)
-    stab = tau * dot(u_, grad(s)) * r * dx
-
-    # h = CellDiameter(mesh)
-    # unorm = sqrt(inner(u_,u_)) # ??
-    # Pe = (unorm*h)/(2.0*alpha)
-    # # print('Peclet number = ', Pe)
-    # # nb = sqrt(inner(u_,u_))
-    # tau = 0.5*h*pow(4.0/(Pe*h)+2.0*unorm,-1.0)
-    # # s=s+tau*inner(u_,grad(s))
-    # stab = tau*inner(u_,grad(s)) * r * dx # is this even correct to multiply by r and dx?
+    delta = h/(2.0*vnorm)
+    stab = delta * dot(u_, grad(s)) * r * dx
+    # stab = 0.0
 
     F4 += stab
 
@@ -855,11 +779,16 @@ pc3.setType(PETSc.PC.Type.JACOBI)
 # pc3.setType(PETSc.PC.Type.SOR)
 
 # Solver for step 4
+# # solver4 = PETSc.KSP().create(mesh.comm)
+# # solver4.setType(PETSc.KSP.Type.GMRES)
+# # pc4 = solver4.getPC()
+# # pc4.setType(PETSc.PC.Type.HYPRE)
+# # pc4.setHYPREType("boomeramg")
 # solver4 = PETSc.KSP().create(mesh.comm)
-# solver4.setType(PETSc.KSP.Type.GMRES)
+# solver4.setType(PETSc.KSP.Type.PREONLY)
 # pc4 = solver4.getPC()
-# pc4.setType(PETSc.PC.Type.HYPRE)
-# pc4.setHYPREType("boomeramg")
+# pc4.setType(PETSc.PC.Type.LU)
+# # pc4.setHYPREType("boomeramg")
 solver4 = PETSc.KSP().create(mesh.comm)
 solver4.setType(PETSc.KSP.Type.PREONLY)
 pc4 = solver4.getPC()
@@ -897,7 +826,7 @@ A4 = assemble_matrix(a4, bcs=bcT)
 A4.assemble()
 b4 = assemble_vector(L4)
 
-# print('shape of T_n = ',np.shape(T_n.x.array[:]))
+print('shape of T_n = ',np.shape(T_n.x.array[:]))
 
 while t < t_final + eps:
     # T_n.x.array[:] = DeltaT * theta_n.x.array[:] + T_r # from Ouertatani et al. 2008
@@ -912,11 +841,7 @@ while t < t_final + eps:
     # Assemble and Build Solvers
     # ================================================================
 
-    # A1.zeroEntries()  # resets the matrix
-    # A1 = assemble_matrix(A1, a1, bcs=bcu)
-    # A1.assemble()
     solver1.setOperators(A1)
-
     solver2.setOperators(A2)
     solver3.setOperators(A3)
     solver4.setOperators(A4)
@@ -960,8 +885,7 @@ while t < t_final + eps:
     A4.zeroEntries()
     A4 = assemble_matrix(A4, a4, bcs=bcT)
     A4.assemble()
-    # solver4.setOperators(A4)
-    
+
     # Step 4: Temperature corrrection step
     with b4.localForm() as loc_4:
         loc_4.set(0)
@@ -1001,12 +925,9 @@ while t < t_final + eps:
     t += float(dt)
     ct += 1
 
-print('g = {}'.format(g_f))
-print('alpha = {:.2E}'.format(alpha_f))
-print('mu = {:.2E}'.format(mu_f))
-print('Ra = {:.2E}'.format(Ra))
-print('Pe approx = {:.2E}'.format(Pe_approx))
-print('Re approx = {:.2E}'.format(Re_approx))
+print('alpha = ', alpha_f)
+print('mu = ', mu_f)
+# print('Ra = {:.2E}'.format(Ra))
 
 # visualizing variables
 # ================================================================
