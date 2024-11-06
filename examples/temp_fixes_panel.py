@@ -89,14 +89,14 @@ z_hub = 0.12
 z0 = 0.005
 d0 = 0.0 # 0.65*z_hub
 
-# stabilizing = False
-# save_fn = 'temp_panel'
-stabilizing = True
-save_fn = 'temp_panel_stab'
+stabilizing = False
+save_fn = 'temp_panel'
+# stabilizing = True
+# save_fn = 'temp_panel_stab'
 
-pv_panel_flag = True  # empty domain or with a pv panel in the center?
+pv_panel_flag = True  # empty domain or with a pv panel in the center
 
-t_final = 20.0 # 1.0 # 10.0 # 20.0 # 120.0
+t_final = 0.5 # 1.0 # 10.0 # 20.0 # 120.0
 dt_num = 0.01 # 0.01 #0.001
 
 # ================================================================
@@ -180,9 +180,11 @@ g_f = 9.81
 beta_f = 1/300.0 # [1/K]
 nu_f = 15.89e-6 # 0.01 # 15.89e-6 # 0.01 # [m2/s] kinematic viscosity
 nu_f *= 10
-alpha_f = 22.5/10**6 # m2/s
-alpha_f *= 1 # high Pe (stab needed)
+# alpha_f = 22.5/10**6 # m2/s
+# alpha_f *= 1 # high Pe (stab needed)
 # alpha_f *= 10 # moderate Pe
+# alpha_f *= 20 # threshold: when alpha factor < 20, ringing appears
+alpha_f = 0.0020833333333333333 # Pe = 1
 # alpha_f *= 100 # low Pe (stab not needed)
 rho_f = 1.1314 # kg/m3
 # cp_f = 1.004*1000 # J/kg*K
