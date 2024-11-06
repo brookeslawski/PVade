@@ -1,13 +1,8 @@
 """
-Rayleigh-Benard Convection Flow
-- copied from rayleigh-benard-chorin-dolfinx-dimensional.py by Ethan Young on 8/29 and fixed a few bugs:
-    - switched negative to positive sign on viscosity term in momentum equation
-    - added pressure term into momentum equation
-    - pinned pressure by adding pressure BC
-    - switched solvers back to GMRES and JACOBI
-- copied from Walid Arsalene's FEniCS code, adapted to FEniCSx by Brooke Stanislawski
-- uses the governing equations from Chorin 1968 (Oberbeck-Boussinesq approximation of the Navier-Stokes equations)
-- includes the option to model the classical convective flow in an empty domain or to include a heated pv panel at the center of the domain
+Adding temperature effects for air
+- by Brooke Stanislawski, Ethan Young, and Walid Arsalane
+- via buoyancy term in momentum equation
+- and adding a fourth solve for the advection-diffusion equation for temperature
 """
 
 from mpi4py import MPI
@@ -93,8 +88,6 @@ u_hub = 0.5 #1.0
 z_hub = 0.12
 z0 = 0.005
 d0 = 0.0 # 0.65*z_hub
-
-T_f = T_ambient
 
 # stabilizing = False
 # save_fn = 'temp_panel'
@@ -182,14 +175,6 @@ else:
 # Define Constants
 # ================================================================
 
-# calc alpha from Incropera for water at 300 K
-# g_f = -9.81
-# beta_f = 2.76e-4
-# nu_f = 1.003*10**(-3)
-# k_f = 613*10**(-3) # W/m*K
-# rho_f = 993.88 #998.57 # kg/m3
-# cp_f = 4.179*1000 # J/kg*K
-
 # calc alpha from Incropera for air at 300 K
 g_f = 9.81
 beta_f = 1/300.0 # [1/K]
@@ -203,7 +188,6 @@ rho_f = 1.1314 # kg/m3
 # cp_f = 1.004*1000 # J/kg*K
 mu_f = nu_f * rho_f # dynamic viscosity
 # k_f = 0.0263 # W/m*K
-
 # # alpha_f = k_f/(rho_f*cp_f) # m2/s
 
 # from https://jsdokken.com/dolfinx-tutorial/chapter2/ns_code1.html
@@ -344,11 +328,6 @@ u_noslip = np.array((0,) * mesh.geometry.dim, dtype=PETSc.ScalarType)
 bottom_wall_dofs = locate_dofs_geometrical(V, bottom_wall)
 bcu_bottom_wall = dirichletbc(u_noslip, bottom_wall_dofs, V)
 
-# u_lid = np.array((1,0), dtype=PETSc.ScalarType) # ux, uy = 1, 0
-# top_wall_dofs = locate_dofs_geometrical(V, top_wall)
-# bcu_top_wall = dirichletbc(u_lid, top_wall_dofs, V)
-# bcu_top_wall = dirichletbc(u_noslip, top_wall_dofs, V)
-
 # slip at top wall
 top_wall_entities = locate_entities_boundary(mesh, mesh.geometry.dim-1, top_wall)
 top_wall_dofs = locate_dofs_topological(V.sub(1), mesh.geometry.dim-1, top_wall_entities)
@@ -379,13 +358,13 @@ bcp = [bcp_outlet]
 set_bc(p_n.vector,bcp)
 
 # Temperature Boundary Conditions
-T_r = Constant(mesh, PETSc.ScalarType(T_f))
+T_r = Constant(mesh, PETSc.ScalarType(T_ambient)) # reference temperature
 
 # Interpolate initial temperature vertically for a smooth gradient
 # T_n.interpolate(lambda x: (T0_bottom_wall + (x[1] / y_max) * (T0_top_wall - T0_bottom_wall)))
 
 # Initialize constant fluid temperature everywhere in domain
-T_n.x.array[:] = PETSc.ScalarType(T_f)
+T_n.x.array[:] = PETSc.ScalarType(T_ambient)
 
 # nonuniform temperature bc along bottom wall
 if t_bc_flag == 'rampdown':
@@ -443,7 +422,6 @@ use_pressure_in_F1 = True
 
 F1 = (rho / dt) * inner(u - u_n, v) * dx
 F1 += rho * inner(dot(U_AB, nabla_grad(U_CN)), v) * dx # convection
-# # F1 += mu * inner(div(grad(u)), (v)) * dx
 F1 += mu * inner(grad(U_CN), grad(v)) * dx # viscosity # + or - ??
 F1 -= beta * inner((T_n-T_r) * g, v) * dx # buoyancy # THIS ONE WITH POSITIVE G INPUT PARAMETER
 if use_pressure_in_F1:
@@ -540,11 +518,6 @@ pc3.setType(PETSc.PC.Type.JACOBI)
 
 # Solver for step 4
 # solver4 = PETSc.KSP().create(mesh.comm)
-# solver4.setType(PETSc.KSP.Type.GMRES) # does not work for high Pe cases without stabilization
-# pc4 = solver4.getPC()
-# pc4.setType(PETSc.PC.Type.HYPRE)
-# pc4.setHYPREType("boomeramg")
-# solver4 = PETSc.KSP().create(mesh.comm)
 # solver4.setType(PETSc.KSP.Type.PREONLY)
 # pc4 = solver4.getPC()
 # pc4.setType(PETSc.PC.Type.LU) # works
@@ -566,7 +539,6 @@ with io.XDMFFile(mesh.comm, save_fn+".xdmf", "w") as xdmf:
     xdmf.write_function(u_n, 0)
     xdmf.write_function(p_n, 0)
     xdmf.write_function(T_n, 0)
-    # xdmf.write_function(theta_n, 0)
 
 A1 = assemble_matrix(a1, bcs=bcu)
 A1.assemble()
