@@ -5,6 +5,7 @@ general:
   structural_analysis: false
   fluid_analysis: true
   thermal_analysis: true
+  # empty_domain: true/false
 domain:
   x_min: 0.0
   x_max: 10.0
@@ -14,7 +15,7 @@ domain:
   # y_max: 30.0
   # z_min: 0.0
   # z_max: 20.0
-  l_char: 0.5 #1.25
+  l_char: 0.1 # 0.5 #1.25
 pv_array:
   stream_rows: 0
   span_rows: 0
