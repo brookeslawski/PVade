@@ -3,11 +3,20 @@ import yaml
 import pickle
 import numpy as np
 from scipy.interpolate import griddata
+import argparse
+import os
+
+# Add argument parsing for casepath
+parser = argparse.ArgumentParser(description="Process fluid .h5 data to pickle format.")
+parser.add_argument("--casepath", required=True, help="Path to the case directory.")
+args = parser.parse_args()
+casepath = args.casepath
 
 parentdir = '/scratch/bstanisl/pvade/turb_inflow/'
-casepath = 'y20m_turbinflow_duramat_validation/'
+# casepath = 'halfwing_turbinflow_duramat_validation_neg40deg/'
 
-output_dir=parentdir+'output/'+casepath
+# output_dir=parentdir+'output/'+casepath
+output_dir = os.path.join(parentdir, 'output', casepath)
 
 # read input parameters
 with open(output_dir+'input_params.yaml', 'r') as file:
@@ -77,6 +86,7 @@ alldata['w'] = np.full((nt, nx, ny, nz), np.nan, dtype=float) #np.empty((nt, nx,
 # alldata['T'] = np.empty((nt, nx, ny))
 
 # Interpolate
+# for t in np.arange(100, 104): #range(nt):
 for t in np.arange(100, nt): #range(nt):
     if t % 100 == 0:
         print('nt = {}'.format(t), flush=True)
