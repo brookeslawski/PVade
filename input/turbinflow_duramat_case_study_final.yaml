@@ -53,7 +53,7 @@ structure:
   dt : 0.006
   rho: 124.0
   poissons_ratio: 0.3
-  elasticity_modulus: 0.4e+09
+  elasticity_modulus: 4.0e+09
   body_force_x: 0.0
   body_force_y: 0.0
   body_force_z: 0.0
