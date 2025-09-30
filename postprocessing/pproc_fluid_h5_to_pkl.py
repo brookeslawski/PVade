@@ -25,7 +25,7 @@ with open(output_dir+'input_params.yaml', 'r') as file:
 print('tracker_angle = {} m/s'.format(params['pv_array']['tracker_angle']), flush=True)
 dt = params['solver']['dt']
 
-save_pkl_name = f'duramatval_tracker_angle_{params['pv_array']['tracker_angle']}.pkl'
+save_pkl_name = f'{casepath}_angle_{params['pv_array']['tracker_angle']}.pkl'
 
 fname = output_dir + 'solution/solution_fluid.h5'
 
