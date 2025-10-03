@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import yaml
 import pickle
+import os
 from datetime import timedelta
 
 # spectra
@@ -28,27 +29,29 @@ def read_pvade_csv(pvade_output_dir):
     loadsdata = tmp
     
     # read in accelerations
-    tmp2 = pd.read_csv(pvade_output_dir+'solution/accel_pos.csv')
-    #handling runs with updated outputs
-    if 'deformation' in tmp2.columns[0]:
-        loadsdata['accel-x'] = tmp2['x-acceleration'].values
-        loadsdata['accel-y'] = tmp2['y-acceleration'].values
-        loadsdata['accel-z'] = tmp2['z-acceleration'].values
-        # loadsdata['accel-magnitude'] = loadsdata['accel-x']**2 + loadsdata['accel-y']**2 + loadsdata['accel-z']**2
-        loadsdata['def-x'] = tmp2['#x-deformation'].values
-        loadsdata['def-y'] = tmp2['y-deformation'].values
-        loadsdata['def-z'] = tmp2['z-deformation'].values
-        # loadsdata['def-magnitude'] = loadsdata['def-x']**2 + loadsdata['def-y']**2 + loadsdata['def-z']**2
-    else: # output is mislabeled, correct here
-        loadsdata['def-x'] = tmp2['#x-pos'].values
-        loadsdata['def-y'] = tmp2['y-pos'].values
-        loadsdata['def-z'] = tmp2['z-pos'].values
-        # loadsdata['accel-magnitude'] = loadsdata['accel-x']**2 + loadsdata['accel-y']**2 + loadsdata['accel-z']**2
+    accel_fname = pvade_output_dir+'solution/accel_pos.csv'
+    if os.path.exists(accel_fname):
+        tmp2 = pd.read_csv(accel_fname)
+        #handling runs with updated outputs
+        if 'deformation' in tmp2.columns[0]:
+            loadsdata['accel-x'] = tmp2['x-acceleration'].values
+            loadsdata['accel-y'] = tmp2['y-acceleration'].values
+            loadsdata['accel-z'] = tmp2['z-acceleration'].values
+            # loadsdata['accel-magnitude'] = loadsdata['accel-x']**2 + loadsdata['accel-y']**2 + loadsdata['accel-z']**2
+            loadsdata['def-x'] = tmp2['#x-deformation'].values
+            loadsdata['def-y'] = tmp2['y-deformation'].values
+            loadsdata['def-z'] = tmp2['z-deformation'].values
+            # loadsdata['def-magnitude'] = loadsdata['def-x']**2 + loadsdata['def-y']**2 + loadsdata['def-z']**2
+        else: # output is mislabeled, correct here
+            loadsdata['def-x'] = tmp2['#x-pos'].values
+            loadsdata['def-y'] = tmp2['y-pos'].values
+            loadsdata['def-z'] = tmp2['z-pos'].values
+            # loadsdata['accel-magnitude'] = loadsdata['accel-x']**2 + loadsdata['accel-y']**2 + loadsdata['accel-z']**2
+        del tmp2
     
     # clean up
     del tmp
-    del tmp2
-
+    
     return loadsdata
 
 def read_params(pvade_output_dir):
@@ -71,7 +74,8 @@ def read_params(pvade_output_dir):
 def read_pvade_output_pkl(pkl_path):
     readdata = {}
     coords = {}
-    
+
+    # initialize
     try:
         with open(pkl_path, 'rb') as f:
             # try:
@@ -82,6 +86,7 @@ def read_pvade_output_pkl(pkl_path):
             readdata['v'] = readrawdata['v']
             readdata['w'] = readrawdata['w']
             print('vel data nt, nx, ny, nz = ', np.shape(readdata['u']))
+
     except Exception as e:
         print(f"Error loading pickle file: {e}")
 
